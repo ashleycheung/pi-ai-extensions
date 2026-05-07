@@ -18,34 +18,73 @@ import { join } from "path";
 
 const IGNORE_DIRS = ["node_modules", "dist", "build"];
 
-/**
- * Exclude all the directories from grep
- */
-function transformGrepCommands(bash: string) {
-  let transformedBash = bash;
-  transformedBash = transformedBash.replace(
-    /\bgrep\b/g,
-    `grep ${IGNORE_DIRS.map((dir) => `--exclude-dir=${dir}`).join(" ")}`
-  );
-  return transformedBash;
-}
-
-/**
- * Add exclude directories to find
- */
-function transformFindCommands(bash: string) {
-  let transformedBash = bash;
-  transformedBash = transformedBash.replace(
-    /\bfind \S+(?=\s+-|\s+\||$)/g,
-    (match) =>
-      `${match} ${IGNORE_DIRS.map((dir) => `-name "${dir}" -prune -o`).join(
-        " "
-      )}`
-  );
-  return transformedBash;
-}
-
 export default function (pi: ExtensionAPI) {
+  pi.registerTool({
+    name: "search_codebase_for_file",
+    label: "Search Codebase for file",
+    description:
+      "Searches the codebase for files that has file path matching the search string",
+    promptSnippet:
+      "Searches the codebase for files that has file path matching the search string",
+    promptGuidelines: [
+      "Use this tool if you want to search for files with a file path matching the given search string",
+    ],
+    parameters: Type.Object({
+      searchText: Type.String(),
+    }),
+    async execute(toolCallId, params, signal, onUpdate, ctx): Promise<any> {
+      // Check for cancellation
+      if (signal?.aborted) {
+        return { content: [{ type: "text", text: "Cancelled" }] };
+      }
+
+      // Stream progress updates
+      onUpdate?.({
+        content: [{ type: "text", text: "Searching files" }],
+        details: { progress: 50 },
+      });
+
+      const result = await pi.exec("fd", [params.searchText]);
+
+      const resultText = await handleTruncation(result.stdout);
+
+      return { content: [{ type: "text", text: resultText }] };
+    },
+  });
+  pi.registerTool({
+    name: "search_codebase",
+    label: "Search Codebase",
+    description: "Searches the codebase for a particular text",
+    promptSnippet: "Searches the codebase for a particular text",
+    promptGuidelines: [
+      "Use this tool if you want to search the codebase for a particular text",
+    ],
+    parameters: Type.Object({
+      searchText: Type.String(),
+    }),
+    async execute(toolCallId, params, signal, onUpdate, ctx): Promise<any> {
+      // Check for cancellation
+      if (signal?.aborted) {
+        return { content: [{ type: "text", text: "Cancelled" }] };
+      }
+
+      // Stream progress updates
+      onUpdate?.({
+        content: [{ type: "text", text: "Searching codebase..." }],
+        details: { progress: 50 },
+      });
+
+      const result = await pi.exec("rg", [params.searchText]);
+
+      const resultText = await handleTruncation(result.stdout);
+
+      return { content: [{ type: "text", text: resultText }] };
+    },
+  });
+
+  /**
+   * Folder structure tool
+   */
   pi.registerTool({
     name: "get_folder_structure",
     label: "Get Folder Structure",
@@ -105,36 +144,7 @@ export default function (pi: ExtensionAPI) {
       const paths = result.stdout.trim().split("\n").filter(Boolean);
       const tree = buildTree(paths);
 
-      // Apply truncation
-      const truncation = truncateHead(tree, {
-        maxLines: DEFAULT_MAX_LINES,
-        maxBytes: DEFAULT_MAX_BYTES,
-      });
-
-      let resultText = truncation.content;
-
-      if (truncation.truncated) {
-        // Save full output to a temp file so LLM can access it if needed
-        const tempDir = await mkdtemp(join(tmpdir(), "pi-rg-"));
-        const tempFile = join(tempDir, "output.txt");
-        await withFileMutationQueue(tempFile, async () => {
-          await writeFile(tempFile, tree, "utf8");
-        });
-
-        // Add truncation notice - this helps the LLM understand the output is incomplete
-        const truncatedLines = truncation.totalLines - truncation.outputLines;
-        const truncatedBytes = truncation.totalBytes - truncation.outputBytes;
-
-        resultText += `\n\n[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines`;
-        resultText += ` (${formatSize(truncation.outputBytes)} of ${formatSize(
-          truncation.totalBytes
-        )}).`;
-        resultText += ` ${truncatedLines} lines (${formatSize(
-          truncatedBytes
-        )}) omitted.`;
-        resultText += ` Full output saved to: ${tempFile}]`;
-      }
-
+      const resultText = handleTruncation(tree);
       return { content: [{ type: "text", text: resultText }] };
     },
   });
@@ -171,4 +181,71 @@ export default function (pi: ExtensionAPI) {
       }
     }
   );
+}
+
+// ╔══════════════════════════════════╗
+// ║        Utility Functions         ║
+// ╚══════════════════════════════════╝
+
+/**
+ * Truncates a really long response
+ */
+async function handleTruncation(contents: string) {
+  // Apply truncation
+  const truncation = truncateHead(contents, {
+    maxLines: DEFAULT_MAX_LINES,
+    maxBytes: DEFAULT_MAX_BYTES,
+  });
+
+  let resultText = truncation.content;
+
+  if (truncation.truncated) {
+    // Save full output to a temp file so LLM can access it if needed
+    const tempDir = await mkdtemp(join(tmpdir(), "pi-rg-"));
+    const tempFile = join(tempDir, "output.txt");
+    await withFileMutationQueue(tempFile, async () => {
+      await writeFile(tempFile, contents, "utf8");
+    });
+
+    // Add truncation notice - this helps the LLM understand the output is incomplete
+    const truncatedLines = truncation.totalLines - truncation.outputLines;
+    const truncatedBytes = truncation.totalBytes - truncation.outputBytes;
+
+    resultText += `\n\n[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines`;
+    resultText += ` (${formatSize(truncation.outputBytes)} of ${formatSize(
+      truncation.totalBytes
+    )}).`;
+    resultText += ` ${truncatedLines} lines (${formatSize(
+      truncatedBytes
+    )}) omitted.`;
+    resultText += ` Full output saved to: ${tempFile}]`;
+  }
+  return resultText;
+}
+
+/**
+ * Exclude all the directories from grep
+ */
+function transformGrepCommands(bash: string) {
+  let transformedBash = bash;
+  transformedBash = transformedBash.replace(
+    /\bgrep\b/g,
+    `grep ${IGNORE_DIRS.map((dir) => `--exclude-dir=${dir}`).join(" ")}`
+  );
+  return transformedBash;
+}
+
+/**
+ * Add exclude directories to find
+ */
+function transformFindCommands(bash: string) {
+  let transformedBash = bash;
+  transformedBash = transformedBash.replace(
+    /\bfind \S+(?=\s+-|\s+\||$)/g,
+    (match) =>
+      `${match} ${IGNORE_DIRS.map((dir) => `-name "${dir}" -prune -o`).join(
+        " "
+      )}`
+  );
+  return transformedBash;
 }
