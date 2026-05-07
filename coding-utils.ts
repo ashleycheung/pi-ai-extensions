@@ -1,8 +1,17 @@
-// @ts-nocheck
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+/**
+ * This extension add some code utils to make programming easier
+ */
+import type {
+  ExtensionAPI,
+  ToolCallEvent,
+  ToolCallEventResult,
+} from "@mariozechner/pi-coding-agent";
 
 const IGNORE_DIRS = ["node_modules", "dist", "build"];
 
+/**
+ * Exclude all the directories from grep
+ */
 function transformGrepCommands(bash: string) {
   let transformedBash = bash;
   transformedBash = transformedBash.replace(
@@ -12,6 +21,9 @@ function transformGrepCommands(bash: string) {
   return transformedBash;
 }
 
+/**
+ * Add exclude directories to find
+ */
 function transformFindCommands(bash: string) {
   let transformedBash = bash;
   transformedBash = transformedBash.replace(
@@ -31,24 +43,30 @@ export default function (pi: ExtensionAPI) {
   });
 
   // Check tool calls
-  pi.on("tool_call", async (event, ctx) => {
-    // Bash tool
-    if (event.toolName === "bash") {
-      const command = event.input.command?.trim() as string | undefined;
-      if (!command) return;
+  pi.on(
+    "tool_call" as any,
+    async (event: ToolCallEvent, ctx): Promise<ToolCallEventResult | void> => {
+      // Bash tool
+      if (event.toolName === "bash") {
+        const command = (event.input.command as any)?.trim() as
+          | string
+          | undefined;
+        if (!command) return;
 
-      let finalCommand = command;
-      finalCommand = transformGrepCommands(finalCommand);
-      finalCommand = transformFindCommands(finalCommand);
+        let finalCommand = command;
+        finalCommand = transformGrepCommands(finalCommand);
+        finalCommand = transformFindCommands(finalCommand);
 
-      if (finalCommand !== command) {
-        ctx.ui.notify(`Bash command transformed to: ${finalCommand}`, "info");
+        if (finalCommand !== command) {
+          ctx.ui.notify(`Bash command transformed to: ${finalCommand}`, "info");
+        }
+
+        const newInput: ToolCallEvent["input"] = {
+          ...event.input,
+          command: finalCommand,
+        };
+        return newInput as any;
       }
-
-      return {
-        ...event.input,
-        command: finalCommand,
-      };
     }
-  });
+  );
 }
