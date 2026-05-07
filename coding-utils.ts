@@ -20,14 +20,14 @@ const IGNORE_DIRS = ["node_modules", "dist", "build"];
 
 export default function (pi: ExtensionAPI) {
   pi.registerTool({
-    name: "search_codebase_for_file",
-    label: "Search Codebase for file",
+    name: "search_files",
+    label: "Search files",
     description:
-      "Searches the codebase for files that has file path matching the search string",
+      "Searches for files that has filename matching the search string",
     promptSnippet:
-      "Searches the codebase for files that has file path matching the search string",
+      "Searches the for files that has filename matching the search string",
     promptGuidelines: [
-      "Use this tool if you want to search for files with a file path matching the given search string",
+      "Use this tool if you want to search for files with a filename matching the given search string",
     ],
     parameters: Type.Object({
       searchText: Type.String(),
@@ -144,7 +144,7 @@ export default function (pi: ExtensionAPI) {
       const paths = result.stdout.trim().split("\n").filter(Boolean);
       const tree = buildTree(paths);
 
-      const resultText = handleTruncation(tree);
+      const resultText = await handleTruncation(tree);
       return { content: [{ type: "text", text: resultText }] };
     },
   });
