@@ -1,0 +1,54 @@
+// @ts-nocheck
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+
+const IGNORE_DIRS = ["node_modules", "dist", "build"];
+
+function transformGrepCommands(bash: string) {
+  let transformedBash = bash;
+  transformedBash = transformedBash.replace(
+    /\bgrep\b/g,
+    `grep ${IGNORE_DIRS.map((dir) => `--exclude-dir=${dir}`).join(" ")}`
+  );
+  return transformedBash;
+}
+
+function transformFindCommands(bash: string) {
+  let transformedBash = bash;
+  transformedBash = transformedBash.replace(
+    /\bfind \S+(?=\s+-|\s+\||$)/g,
+    (match) =>
+      `${match} ${IGNORE_DIRS.map((dir) => `-name "${dir}" -prune -o`).join(
+        " "
+      )}`
+  );
+  return transformedBash;
+}
+
+export default function (pi: ExtensionAPI) {
+  // React to events
+  pi.on("session_start", async (_event, ctx) => {
+    ctx.ui.notify("Coding Utils Loaded", "info");
+  });
+
+  // Check tool calls
+  pi.on("tool_call", async (event, ctx) => {
+    // Bash tool
+    if (event.toolName === "bash") {
+      const command = event.input.command?.trim() as string | undefined;
+      if (!command) return;
+
+      let finalCommand = command;
+      finalCommand = transformGrepCommands(finalCommand);
+      finalCommand = transformFindCommands(finalCommand);
+
+      if (finalCommand !== command) {
+        ctx.ui.notify(`Bash command transformed to: ${finalCommand}`, "info");
+      }
+
+      return {
+        ...event.input,
+        command: finalCommand,
+      };
+    }
+  });
+}
