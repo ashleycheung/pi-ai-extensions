@@ -165,6 +165,17 @@ export default function (pi: ExtensionAPI) {
           | undefined;
         if (!command) return;
 
+        /**
+         * Ban git usages cus you dont want the agent pushing
+         * or messing up your git
+         */
+        if (/\bgit\b/g.test(command))
+          return {
+            block: true,
+            reason:
+              "Git commands are STRICTLY NOT ALLOWED. You MUST let the user know you do not have git permissions",
+          };
+
         let finalCommand = command;
         finalCommand = transformGrepCommands(finalCommand);
         finalCommand = transformFindCommands(finalCommand);
