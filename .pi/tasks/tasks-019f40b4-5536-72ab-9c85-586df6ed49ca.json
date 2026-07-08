@@ -1,0 +1,38 @@
+{
+  "nextId": 4,
+  "tasks": [
+    {
+      "id": "1",
+      "subject": "Analyze coding-utils extension prompt injection",
+      "description": "Find and examine the coding-utils extension to understand what prompts are injected after each message",
+      "status": "completed",
+      "metadata": {},
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1783497081174,
+      "updatedAt": 1783497148749
+    },
+    {
+      "id": "2",
+      "subject": "Investigate before_agent_start timing",
+      "description": "Determine if before_agent_start prompt is injected after every message or only at the start of the session",
+      "status": "completed",
+      "metadata": {},
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1783497259373,
+      "updatedAt": 1783497439915
+    },
+    {
+      "id": "3",
+      "subject": "Find subagent extension and its available tools",
+      "description": "Search for a subagent-related extension and identify what tools it registers",
+      "status": "pending",
+      "metadata": {},
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1783497698762,
+      "updatedAt": 1783497698762
+    }
+  ]
+}

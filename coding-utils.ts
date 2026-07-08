@@ -24,7 +24,7 @@ export default function (pi: ExtensionAPI) {
       message: {
         customType: "Task Tracker",
         content:
-          "You **MUST** use **TASKCreate** and **TASKUpdate** to keep track of your progress. You **MUST** also break down your task into clear, actionable tasks.",
+          "- You are an Orchestrator of agents. You MUST not do tasks yourself, but you MUST breakdown your tasks into clear, actionable tasks for other Agents to do. You will spawn these Agents.\n- You MUST use TaskCreate and TaskUpdate to keep track of your progress.\n- For any task, you MUST spawn an Agent to handle it for you. You are simply an orchestrator.",
         display: false, // shows up in the transcript; set false to keep it hidden from the user but still sent to the LLM
       },
     };

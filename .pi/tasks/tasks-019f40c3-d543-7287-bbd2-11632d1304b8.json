@@ -1,0 +1,18 @@
+{
+  "nextId": 2,
+  "tasks": [
+    {
+      "id": "1",
+      "subject": "Update coding-utils extension prompt",
+      "description": "Update the injected prompt in coding-utils.ts before_agent_start event handler with the new instructions about using TaskCreate, TaskUpdate, and spawning Agents.",
+      "status": "completed",
+      "metadata": {
+        "agentType": "general-purpose"
+      },
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1783498202923,
+      "updatedAt": 1783498444039
+    }
+  ]
+}
