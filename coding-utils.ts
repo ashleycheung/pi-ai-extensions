@@ -19,6 +19,16 @@ import { join } from "path";
 const IGNORE_DIRS = ["node_modules", "dist", "build"];
 
 export default function (pi: ExtensionAPI) {
+  pi.on("before_agent_start", async () => {
+    return {
+      message: {
+        customType: "Task Tracker",
+        content:
+          "You **MUST** use **TASKCreate** and **TASKUpdate** to keep track of your progress. You **MUST** also break down your task into clear, actionable tasks.",
+        display: false, // shows up in the transcript; set false to keep it hidden from the user but still sent to the LLM
+      },
+    };
+  });
   pi.registerTool({
     name: "search_files",
     label: "Search files",
@@ -27,7 +37,7 @@ export default function (pi: ExtensionAPI) {
     promptSnippet:
       "Searches the for files that has filename matching the search string",
     promptGuidelines: [
-      "Use this tool if you want to search for files with a filename matching the given search string",
+      "You **MUST** use 'search_files' tool to search for files with a filename matching the given search string",
     ],
     parameters: Type.Object({
       searchText: Type.String(),
@@ -46,6 +56,18 @@ export default function (pi: ExtensionAPI) {
 
       const result = await pi.exec("fd", [params.searchText]);
 
+      const output = result.stdout.trim();
+      if (!output) {
+        if (result.code !== 0) {
+          const err =
+            result.stderr.trim() || `fd exited with code ${result.code}`;
+          return { content: [{ type: "text", text: `Search failed: ${err}` }] };
+        }
+        return {
+          content: [{ type: "text", text: "No files found matching pattern" }],
+        };
+      }
+
       const resultText = await handleTruncation(result.stdout);
 
       return { content: [{ type: "text", text: resultText }] };
@@ -57,7 +79,7 @@ export default function (pi: ExtensionAPI) {
     description: "Searches the codebase for a particular text",
     promptSnippet: "Searches the codebase for a particular text",
     promptGuidelines: [
-      "Use this tool if you want to search the codebase for a particular text",
+      "You **MUST** use 'search_codebase' tool to search the codebase for a particular text",
     ],
     parameters: Type.Object({
       searchText: Type.String(),
@@ -76,83 +98,89 @@ export default function (pi: ExtensionAPI) {
 
       const result = await pi.exec("rg", [params.searchText]);
 
+      // ripgrep exits 1 with empty stdout when there are no matches (not an error)
+      const output = result.stdout.trim();
+      if (!output) {
+        if (result.code !== 0 && result.code !== 1) {
+          const err =
+            result.stderr.trim() || `ripgrep exited with code ${result.code}`;
+          return { content: [{ type: "text", text: `Search failed: ${err}` }] };
+        }
+        return { content: [{ type: "text", text: "No matches found" }] };
+      }
+
       const resultText = await handleTruncation(result.stdout);
 
       return { content: [{ type: "text", text: resultText }] };
     },
   });
 
-  /**
-   * Folder structure tool
-   */
-  pi.registerTool({
-    name: "get_folder_structure",
-    label: "Get Folder Structure",
-    description:
-      "Gets the filestructure of a folder. This will give you the recursive folder structure of the given folder",
-    promptSnippet: "Gets the folder structure",
-    promptGuidelines: [
-      "Use this tool to get a summary of the folder structure of a given folder. Use this to get folder summaries of codebases",
-    ],
-    parameters: Type.Object({
-      folderPath: Type.String(),
-    }),
-    async execute(toolCallId, params, signal, onUpdate, ctx): Promise<any> {
-      // Check for cancellation
-      if (signal?.aborted) {
-        return { content: [{ type: "text", text: "Cancelled" }] };
-      }
+  // /**
+  //  * Folder structure tool
+  //  */
+  // pi.registerTool({
+  //   name: "get_folder_structure",
+  //   label: "Get Folder Structure",
+  //   description:
+  //     "Gets the filestructure of a folder. This will give you the recursive folder structure of the given folder",
+  //   promptSnippet: "Gets the folder structure",
+  //   promptGuidelines: [
+  //     "Use the 'get_folder_structure' tool to get a summary of the folder structure of a given folder. Use this to get folder summaries of codebases",
+  //   ],
+  //   parameters: Type.Object({
+  //     folderPath: Type.String(),
+  //   }),
+  //   async execute(toolCallId, params, signal, onUpdate, ctx): Promise<any> {
+  //     // Check for cancellation
+  //     if (signal?.aborted) {
+  //       return { content: [{ type: "text", text: "Cancelled" }] };
+  //     }
 
-      // Stream progress updates
-      onUpdate?.({
-        content: [{ type: "text", text: "Getting folder structure..." }],
-        details: { progress: 50 },
-      });
+  //     // Stream progress updates
+  //     onUpdate?.({
+  //       content: [{ type: "text", text: "Getting folder structure..." }],
+  //       details: { progress: 50 },
+  //     });
 
-      const result = await pi.exec("fd", [
-        "-t",
-        "d",
-        ".",
-        params.folderPath ?? ".",
-      ]);
+  //     const result = await pi.exec("fd", [
+  //       "-t",
+  //       "d",
+  //       ".",
+  //       params.folderPath ?? ".",
+  //     ]);
 
-      const buildTree = (paths: string[]): string => {
-        const tree: Record<string, any> = {};
+  //     const buildTree = (paths: string[]): string => {
+  //       const tree: Record<string, any> = {};
 
-        for (const path of paths) {
-          const parts = path.replace(/\/$/, "").split("/");
-          let node = tree;
-          for (const part of parts) {
-            node[part] = node[part] ?? {};
-            node = node[part];
-          }
-        }
+  //       for (const path of paths) {
+  //         const parts = path.replace(/\/$/, "").split("/");
+  //         let node = tree;
+  //         for (const part of parts) {
+  //           node[part] = node[part] ?? {};
+  //           node = node[part];
+  //         }
+  //       }
 
-        const render = (node: Record<string, any>, indent = 0): string => {
-          return Object.keys(node)
-            .map((key) => {
-              const prefix = "  ".repeat(indent) + "- ";
-              const children = render(node[key], indent + 1);
-              return prefix + key + (children ? "\n" + children : "");
-            })
-            .join("\n");
-        };
+  //       const render = (node: Record<string, any>, indent = 0): string => {
+  //         return Object.keys(node)
+  //           .map((key) => {
+  //             const prefix = "  ".repeat(indent) + "- ";
+  //             const children = render(node[key], indent + 1);
+  //             return prefix + key + (children ? "\n" + children : "");
+  //           })
+  //           .join("\n");
+  //       };
 
-        return render(tree);
-      };
+  //       return render(tree);
+  //     };
 
-      const paths = result.stdout.trim().split("\n").filter(Boolean);
-      const tree = buildTree(paths);
+  //     const paths = result.stdout.trim().split("\n").filter(Boolean);
+  //     const tree = buildTree(paths);
 
-      const resultText = await handleTruncation(tree);
-      return { content: [{ type: "text", text: resultText }] };
-    },
-  });
-
-  // React to events
-  pi.on("session_start", async (_event, ctx) => {
-    ctx.ui.notify("Coding Utils Loaded", "info");
-  });
+  //     const resultText = await handleTruncation(tree);
+  //     return { content: [{ type: "text", text: resultText }] };
+  //   },
+  // });
 
   // Check tool calls
   pi.on(
@@ -169,12 +197,12 @@ export default function (pi: ExtensionAPI) {
          * Ban git usages cus you dont want the agent pushing
          * or messing up your git
          */
-        if (/\bgit\b/g.test(command))
-          return {
-            block: true,
-            reason:
-              "Git commands are STRICTLY NOT ALLOWED. You MUST let the user know you do not have git permissions",
-          };
+        // if (/\bgit\b/g.test(command))
+        //   return {
+        //     block: true,
+        //     reason:
+        //       "Git commands are STRICTLY NOT ALLOWED. You MUST let the user know you do not have git permissions",
+        //   };
 
         let finalCommand = command;
         finalCommand = transformGrepCommands(finalCommand);
