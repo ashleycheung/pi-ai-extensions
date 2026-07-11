@@ -26,6 +26,7 @@ enum AIMode {
 let mode = AIMode.None;
 let hasSentInitialModeMessage = false;
 let showModeMessage = false;
+const modeStatus = "ai-mode-status";
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("showmodemessage", {
@@ -45,6 +46,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("execute", {
     description: "Changes to execute mode",
     handler: async (args, ctx) => {
+      ctx.ui.setStatus(modeStatus, hexAnsi("#ED64A6")("Execute Mode"));
       mode = AIMode.Execute;
       hasSentInitialModeMessage = false;
       ctx.ui.notify(`Changed to Execute Mode`, "info");
@@ -53,6 +55,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("plan", {
     description: "Changes to plan mode",
     handler: async (args, ctx) => {
+      ctx.ui.setStatus(modeStatus, hexAnsi("#ED8936")("Plan Mode"));
       mode = AIMode.Plan;
       hasSentInitialModeMessage = false;
       ctx.ui.notify(`Changed to Plan Mode`, "info");
@@ -91,7 +94,9 @@ export default function (pi: ExtensionAPI) {
                 When drafting this plan:
                   - You MUST breakdown your task into smaller actionable tasks.
                   - You MUST use TaskCreate and TaskUpdate to keep track of your progress.
-                  - When exploring the codebase, you MUST use an Explore Agent via the Agent tool
+                  - When exploring the codebase, you MUST use an Explore Agent via the Agent tool.
+                  - If there are any ambiguities in the plan, you MUST clarify with the user.
+                  - When your plan is complete, you MUST ask the user if they would like to execute on the plan.
               `,
               display: showModeMessage,
             },
@@ -281,4 +286,12 @@ function transformFindCommands(bash: string) {
       )}`
   );
   return transformedBash;
+}
+
+function hexAnsi(hex: string) {
+  const n = parseInt(hex.replace("#", ""), 16);
+  const r = (n >> 16) & 255,
+    g = (n >> 8) & 255,
+    b = n & 255;
+  return (text: string) => `\x1b[38;2;${r};${g};${b}m${text}\x1b[0m`;
 }
