@@ -18,16 +18,88 @@ import { join } from "path";
 
 const IGNORE_DIRS = ["node_modules", "dist", "build"];
 
+enum AIMode {
+  None = "none",
+  Execute = "execute",
+  Plan = "plan",
+}
+let mode = AIMode.None;
+let hasSentInitialModeMessage = false;
+let showModeMessage = false;
+
 export default function (pi: ExtensionAPI) {
+  pi.registerCommand("showmodemessage", {
+    description: "Shows the message injected at the start of each mode",
+    handler: async (args, ctx) => {
+      showModeMessage = true;
+      ctx.ui.notify(`Show Mode Message set to true`, "info");
+    },
+  });
+  pi.registerCommand("hidemodemessage", {
+    description: "Hides the message injected at the start of each mode",
+    handler: async (args, ctx) => {
+      showModeMessage = false;
+      ctx.ui.notify(`Show Mode Message set to false`, "info");
+    },
+  });
+  pi.registerCommand("execute", {
+    description: "Changes to execute mode",
+    handler: async (args, ctx) => {
+      mode = AIMode.Execute;
+      hasSentInitialModeMessage = false;
+      ctx.ui.notify(`Changed to Execute Mode`, "info");
+    },
+  });
+  pi.registerCommand("plan", {
+    description: "Changes to plan mode",
+    handler: async (args, ctx) => {
+      mode = AIMode.Plan;
+      hasSentInitialModeMessage = false;
+      ctx.ui.notify(`Changed to Plan Mode`, "info");
+    },
+  });
   pi.on("before_agent_start", async () => {
-    return {
-      message: {
-        customType: "Task Tracker",
-        content:
-          "- You are an Orchestrator of agents. You MUST not do tasks yourself, but you MUST breakdown your tasks into clear, actionable tasks for other Agents to do. You will spawn these Agents.\n- You MUST use TaskCreate and TaskUpdate to keep track of your progress.\n- For any task, you MUST spawn an Agent to handle it for you. You are simply an orchestrator.",
-        display: false, // shows up in the transcript; set false to keep it hidden from the user but still sent to the LLM
-      },
-    };
+    switch (mode) {
+      case AIMode.Execute: {
+        if (!hasSentInitialModeMessage) {
+          hasSentInitialModeMessage = true;
+          return {
+            message: {
+              customType: "Execute Mode",
+              content: `
+                You are in Execute Mode and you MUST execute on a task.
+                You MUST breakdown your task into smaller actionable tasks.
+                You MUST use TaskCreate and TaskUpdate to keep track of your progress.
+                When exploring the codebase, you MUST use an Explore Agent via the Agent tool
+              `,
+              display: showModeMessage,
+            },
+          };
+        }
+        break;
+      }
+      case AIMode.Plan: {
+        if (!hasSentInitialModeMessage) {
+          hasSentInitialModeMessage = true;
+          return {
+            message: {
+              customType: "Plan Mode",
+              content: `
+                You are in Plan Mode and you are to draft a plan.
+                You MUST NOT make any file changes.
+                All your actions, commands, and scripts MUST be readonly.
+                When drafting this plan:
+                  - You MUST breakdown your task into smaller actionable tasks.
+                  - You MUST use TaskCreate and TaskUpdate to keep track of your progress.
+                  - When exploring the codebase, you MUST use an Explore Agent via the Agent tool
+              `,
+              display: showModeMessage,
+            },
+          };
+        }
+        break;
+      }
+    }
   });
   pi.registerTool({
     name: "search_files",
@@ -115,73 +187,6 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  // /**
-  //  * Folder structure tool
-  //  */
-  // pi.registerTool({
-  //   name: "get_folder_structure",
-  //   label: "Get Folder Structure",
-  //   description:
-  //     "Gets the filestructure of a folder. This will give you the recursive folder structure of the given folder",
-  //   promptSnippet: "Gets the folder structure",
-  //   promptGuidelines: [
-  //     "Use the 'get_folder_structure' tool to get a summary of the folder structure of a given folder. Use this to get folder summaries of codebases",
-  //   ],
-  //   parameters: Type.Object({
-  //     folderPath: Type.String(),
-  //   }),
-  //   async execute(toolCallId, params, signal, onUpdate, ctx): Promise<any> {
-  //     // Check for cancellation
-  //     if (signal?.aborted) {
-  //       return { content: [{ type: "text", text: "Cancelled" }] };
-  //     }
-
-  //     // Stream progress updates
-  //     onUpdate?.({
-  //       content: [{ type: "text", text: "Getting folder structure..." }],
-  //       details: { progress: 50 },
-  //     });
-
-  //     const result = await pi.exec("fd", [
-  //       "-t",
-  //       "d",
-  //       ".",
-  //       params.folderPath ?? ".",
-  //     ]);
-
-  //     const buildTree = (paths: string[]): string => {
-  //       const tree: Record<string, any> = {};
-
-  //       for (const path of paths) {
-  //         const parts = path.replace(/\/$/, "").split("/");
-  //         let node = tree;
-  //         for (const part of parts) {
-  //           node[part] = node[part] ?? {};
-  //           node = node[part];
-  //         }
-  //       }
-
-  //       const render = (node: Record<string, any>, indent = 0): string => {
-  //         return Object.keys(node)
-  //           .map((key) => {
-  //             const prefix = "  ".repeat(indent) + "- ";
-  //             const children = render(node[key], indent + 1);
-  //             return prefix + key + (children ? "\n" + children : "");
-  //           })
-  //           .join("\n");
-  //       };
-
-  //       return render(tree);
-  //     };
-
-  //     const paths = result.stdout.trim().split("\n").filter(Boolean);
-  //     const tree = buildTree(paths);
-
-  //     const resultText = await handleTruncation(tree);
-  //     return { content: [{ type: "text", text: resultText }] };
-  //   },
-  // });
-
   // Check tool calls
   pi.on(
     "tool_call" as any,
@@ -192,17 +197,6 @@ export default function (pi: ExtensionAPI) {
           | string
           | undefined;
         if (!command) return;
-
-        /**
-         * Ban git usages cus you dont want the agent pushing
-         * or messing up your git
-         */
-        // if (/\bgit\b/g.test(command))
-        //   return {
-        //     block: true,
-        //     reason:
-        //       "Git commands are STRICTLY NOT ALLOWED. You MUST let the user know you do not have git permissions",
-        //   };
 
         let finalCommand = command;
         finalCommand = transformGrepCommands(finalCommand);
