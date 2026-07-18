@@ -26,7 +26,7 @@ enum AIMode {
 let mode = AIMode.None;
 let hasSentInitialModeMessage = false;
 let showModeMessage = false;
-const modeStatus = "ai-mode-status";
+const modeWidget = "ai-mode-widget";
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("showmodemessage", {
@@ -46,7 +46,9 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("execute", {
     description: "Changes to execute mode",
     handler: async (args, ctx) => {
-      ctx.ui.setStatus(modeStatus, hexAnsi("#ED64A6")("Execute Mode"));
+      ctx.ui.setWidget(modeWidget, [hexAnsi("#ED64A6")("Execute Mode")], {
+        placement: "aboveEditor",
+      });
       mode = AIMode.Execute;
       hasSentInitialModeMessage = false;
       ctx.ui.notify(`Changed to Execute Mode`, "info");
@@ -55,7 +57,9 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("plan", {
     description: "Changes to plan mode",
     handler: async (args, ctx) => {
-      ctx.ui.setStatus(modeStatus, hexAnsi("#ED8936")("Plan Mode"));
+      ctx.ui.setWidget(modeWidget, [hexAnsi("#ED8936")("Plan Mode")], {
+        placement: "aboveEditor",
+      });
       mode = AIMode.Plan;
       hasSentInitialModeMessage = false;
       ctx.ui.notify(`Changed to Plan Mode`, "info");
@@ -92,8 +96,7 @@ export default function (pi: ExtensionAPI) {
                 You MUST NOT make any file changes.
                 All your actions, commands, and scripts MUST be readonly.
                 When drafting this plan:
-                  - You MUST breakdown your task into smaller actionable tasks.
-                  - You MUST use TaskCreate and TaskUpdate to keep track of your progress.
+                  - You MUST NOT make any edits
                   - When exploring the codebase, you MUST use an Explore Agent via the Agent tool.
                   - If there are any ambiguities in the plan, you MUST clarify with the user.
                   - When your plan is complete, you MUST ask the user if they would like to execute on the plan.
@@ -102,7 +105,17 @@ export default function (pi: ExtensionAPI) {
             },
           };
         }
-        break;
+        // Nudges
+        return {
+          message: {
+            customType: "Plan Mode Nudge",
+            content: `
+                You are in Plan Mode.
+                You MUST NOT make any edits or file changes
+              `,
+          },
+          display: showModeMessage,
+        };
       }
     }
   });
@@ -196,26 +209,42 @@ export default function (pi: ExtensionAPI) {
   pi.on(
     "tool_call" as any,
     async (event: ToolCallEvent, ctx): Promise<ToolCallEventResult | void> => {
-      // Bash tool
-      if (event.toolName === "bash") {
-        const command = (event.input.command as any)?.trim() as
-          | string
-          | undefined;
-        if (!command) return;
+      switch (event.toolName) {
+        // Bash tool
+        case "bash": {
+          const command = (event.input.command as any)?.trim() as
+            | string
+            | undefined;
+          if (!command) return;
 
-        let finalCommand = command;
-        finalCommand = transformGrepCommands(finalCommand);
-        finalCommand = transformFindCommands(finalCommand);
+          let finalCommand = command;
+          finalCommand = transformGrepCommands(finalCommand);
+          finalCommand = transformFindCommands(finalCommand);
 
-        if (finalCommand !== command) {
-          ctx.ui.notify(`Bash command transformed to: ${finalCommand}`, "info");
+          if (finalCommand !== command) {
+            ctx.ui.notify(
+              `Bash command transformed to: ${finalCommand}`,
+              "info"
+            );
+          }
+
+          const newInput: ToolCallEvent["input"] = {
+            ...event.input,
+            command: finalCommand,
+          };
+          return newInput as any;
         }
-
-        const newInput: ToolCallEvent["input"] = {
-          ...event.input,
-          command: finalCommand,
-        };
-        return newInput as any;
+        case "edit": {
+          if (mode === AIMode.Plan) {
+            return {
+              block: true,
+              reason: `
+              You are in Plan Mode.
+              Edits are strictly NOT allowed.
+              You must explicitly ask the user to change to execute mode to enable file editing`,
+            };
+          }
+        }
       }
     }
   );
