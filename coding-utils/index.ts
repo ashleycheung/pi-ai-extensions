@@ -15,6 +15,7 @@ import { Type } from "typebox";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { isSafeCommand } from "./utils";
 
 const IGNORE_DIRS = ["node_modules", "dist", "build"];
 
@@ -212,6 +213,19 @@ export default function (pi: ExtensionAPI) {
       switch (event.toolName) {
         // Bash tool
         case "bash": {
+          if (
+            mode === AIMode.Plan &&
+            !isSafeCommand(String(event.input.command))
+          ) {
+            return {
+              block: true,
+              reason: `
+              You are in Plan Mode.
+              Destructive bash commands are strictly NOT allowed.
+              You must explicitly ask the user to change to execute mode to enable destructive bash commands`,
+            };
+          }
+
           const command = (event.input.command as any)?.trim() as
             | string
             | undefined;
