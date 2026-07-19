@@ -75,7 +75,7 @@ export default function (pi: ExtensionAPI) {
             message: {
               customType: "Execute Mode",
               content: `
-                You are in Execute Mode and you MUST execute on a task.
+                You are in Execute Mode and you have access to all your read, write, bash commands.
                 You MUST breakdown your task into smaller actionable tasks.
                 You MUST use TaskCreate and TaskUpdate to keep track of your progress.
                 When exploring the codebase, you MUST use an Explore Agent via the Agent tool
