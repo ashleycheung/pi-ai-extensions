@@ -92,13 +92,13 @@ export default function (pi: ExtensionAPI) {
               content: `
                 You are in Plan Mode and you are to draft a plan.
                 You MUST NOT make any file changes.
-                To CREATE a new plan you MUST use the "create_plan" tool.
-                To EDIT an existing plan you MUST use the "edit_plan" tool.
-                To LIST current plans, you MUST use the "list_plan" tool.
-                To READ a plan, you MUST use the "get_plan" tool.
+                To CREATE a new plan you MUST use the "plan_create" tool.
+                To EDIT an existing plan you MUST use the "plan_edit" tool.
+                To LIST current plans, you MUST use the "plan_list" tool.
+                To READ a plan, you MUST use the "plan_get" tool.
                 All your actions, commands, and scripts MUST be readonly.
                 When drafting this plan:
-                  - You MUST NOT make any edits unless its via the "edit_plan" tool
+                  - You MUST NOT make any edits unless its via the "plan_edit" tool
                   - When exploring the codebase, you MUST use an Explore Agent via the Agent tool.
                   - If there are any ambiguities in the plan, you MUST clarify with the user.
                   - When your plan is complete, you MUST ask the user if they would like to execute on the plan.
@@ -121,7 +121,7 @@ export default function (pi: ExtensionAPI) {
       }
     }
   });
-  pi.registerCommand("list_plans", {
+  pi.registerCommand("plan_list", {
     description:
       "Lists all plans in an interactive selector",
     handler: async (args, ctx) => {
@@ -444,14 +444,14 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerTool({
-    name: "get_plan",
-    label: "Get Plan",
+    name: "plan_get",
+    label: "Plan Get",
     description:
       "Gets the markdown contents of a specific plan given the plan id",
     promptSnippet:
       "Retrieves the full markdown content of a saved plan by its plan ID",
     promptGuidelines: [
-      "Use get_plan when the user asks to view or retrieve a previously saved plan.",
+      "Use plan_get when the user asks to view or retrieve a previously saved plan.",
     ],
     parameters: Type.Object({
       planId: Type.String({ description: "The ID of the plan to retrieve" }),
@@ -492,12 +492,12 @@ export default function (pi: ExtensionAPI) {
     },
   });
   pi.registerTool({
-    name: "list_plans",
+    name: "plan_list",
     label: "List Plans",
     description: "Lists all the plans with available with its id + title",
     promptSnippet: "Lists all saved plans with their IDs and titles",
     promptGuidelines: [
-      "Use list_plans to see all available plans and their titles before referencing them.",
+      "Use plan_list to see all available plans and their titles before referencing them.",
     ],
     parameters: Type.Object({}),
     async execute(toolCallId, params, signal, onUpdate, ctx): Promise<any> {
@@ -534,14 +534,14 @@ export default function (pi: ExtensionAPI) {
     },
   });
   pi.registerTool({
-    name: "create_plan",
-    label: "Create Plan",
+    name: "plan_create",
+    label: "Plan Create",
     description:
       "Creates a new plan with a randomly generated ID and the given title",
     promptSnippet:
       "Creates a new plan file with a generated ID and the provided title",
     promptGuidelines: [
-      "Use create_plan to create a new plan. The tool returns the plan ID which you should reference in subsequent calls.",
+      "Use plan_create to create a new plan. The tool returns the plan ID which you should reference in subsequent calls.",
     ],
     parameters: Type.Object({
       title: Type.String({
@@ -578,14 +578,14 @@ export default function (pi: ExtensionAPI) {
     },
   });
   pi.registerTool({
-    name: "edit_plan",
-    label: "Edit Plan",
+    name: "plan_edit",
+    label: "Plan Edit",
     description:
       "Edits a plan given the id. This is a wrapper around the normal edit tool except it accepts the plan id instead of a file path",
     promptSnippet:
       "Edits a plan file by replacing matching text with new content, using the plan ID instead of a file path",
     promptGuidelines: [
-      "Use edit_plan to make changes to a saved plan by referencing its plan ID.",
+      "Use plan_edit to make changes to a saved plan by referencing its plan ID.",
       "Provide the exact oldText to be replaced and the newText to replace it with.",
     ],
     parameters: Type.Object({
