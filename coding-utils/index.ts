@@ -10,7 +10,7 @@ import {
 import { Type } from "typebox";
 import { isSafeCommand } from "./utils";
 import { handleTruncation } from "./truncation";
-import { Key, Markdown, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import { Editor, Key, Markdown, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
 import { hexAnsi } from "./format";
 import { transformGrepCommands, transformFindCommands } from "./transform";
 import { createPlan, deletePlan, getPlan, listPlans, editPlan, getPlanTitle, formatRelativeTime } from "./plans";
@@ -184,11 +184,18 @@ export default function (pi: ExtensionAPI) {
             markdownTheme
           );
           let scrollOffset = 0;
-          let commentText = "";
           let isInputMode = false;
-          const inputAreaLines = 4;
+          const maxEditorLines = 5;
           let cachedLines: string[] | undefined;
           let renderedWidth = 0;
+
+          // Multi-line editor for comments (handles Enter=submit, Shift+Enter=newline)
+          const editor = new Editor(theme, _kb);
+          editor.onSubmit = (text) => {
+            if (text.trim()) {
+              done(text);
+            }
+          };
 
           function refresh() {
             cachedLines = undefined;
@@ -213,30 +220,8 @@ export default function (pi: ExtensionAPI) {
             }
 
             if (isInputMode) {
-              if (matchesKey(data, Key.enter)) {
-                if (commentText.trim()) {
-                  done(commentText);
-                }
-                return;
-              }
-              if (data === "shift+enter") {
-                commentText += "\n";
-                refresh();
-                return;
-              }
-              if (matchesKey(data, Key.backspace)) {
-                commentText = commentText.slice(
-                  0,
-                  -1
-                );
-                refresh();
-                return;
-              }
-              if (data.length === 1) {
-                commentText += data;
-                refresh();
-                return;
-              }
+              editor.handleInput(data);
+              refresh();
               return;
             }
 
@@ -250,6 +235,16 @@ export default function (pi: ExtensionAPI) {
               return;
             }
             if (matchesKey(data, Key.down)) {
+              const editorLineCount = Math.min(
+                maxEditorLines,
+                editor.getText()
+                  ? Math.max(
+                      1,
+                      editor.getLines(renderedWidth - 2).length
+                    )
+                  : 1
+              );
+              const inputAreaLines = 3 + editorLineCount;
               const viewportHeight = Math.max(
                 1,
                 tui.terminal.rows - 5 - inputAreaLines
@@ -276,6 +271,18 @@ export default function (pi: ExtensionAPI) {
               width
             );
             renderedWidth = renderWidth;
+
+            // Calculate editor lines to determine viewport
+            const editorLineCount = Math.min(
+              maxEditorLines,
+              editor.getText()
+                ? Math.max(
+                    1,
+                    editor.getLines(renderWidth - 2).length
+                  )
+                : 1
+            );
+            const inputAreaLines = 3 + editorLineCount;
             const viewportHeight = Math.max(
               1,
               tui.terminal.rows - 5 - inputAreaLines
@@ -341,24 +348,48 @@ export default function (pi: ExtensionAPI) {
               ? "🔤"
               : "💬";
             const hint = isInputMode
-              ? "Type comment • Enter to send • Shift+Enter newline • Tab/Esc to scroll"
+              ? "Enter to send • Shift+Enter newline • Tab/Esc to scroll"
               : "Tab to type comment • ↑↓ scroll • Esc to close";
             lines.push(
               trunc(
                 `${modeIndicator}  ${hint}`
               )
             );
-            const displayText = isInputMode
-              ? (commentText || " ")
-              : (commentText
-                ? commentText
-                : "(press Tab to start typing)");
-            const cursor = isInputMode
-              ? theme.fg("accent", "█")
-              : "";
-            lines.push(
-              trunc(`> ${displayText}${cursor}`)
-            );
+
+            // Render editor content (with line limit)
+            if (isInputMode || editor.getText()) {
+              const editorWidth = Math.max(
+                1,
+                renderWidth - 2
+              );
+              const allEditorLines =
+                editor.getLines(editorWidth);
+              const visibleEditorLines =
+                allEditorLines.slice(
+                  0,
+                  maxEditorLines
+                );
+              for (const line of visibleEditorLines) {
+                lines.push(
+                  trunc(` ${line}`)
+                );
+              }
+              if (
+                allEditorLines.length > maxEditorLines
+              ) {
+                lines.push(
+                  trunc(
+                    ` ⤶ ${allEditorLines.length - maxEditorLines} more line${allEditorLines.length - maxEditorLines !== 1 ? "s" : ""}`
+                  )
+                );
+              }
+            } else {
+              lines.push(
+                trunc(
+                  " (press Tab to start typing)"
+                )
+              );
+            }
 
             cachedLines = lines;
             return lines;
@@ -375,7 +406,8 @@ export default function (pi: ExtensionAPI) {
       );
 
       if (comment) {
-        pi.sendUserMessage(comment);
+        const planPrefix = `[Plan: ${planId}]\n\n`;
+        pi.sendUserMessage(`${planPrefix}${comment}`);
       }
     },
   });
