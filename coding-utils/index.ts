@@ -89,9 +89,13 @@ export default function (pi: ExtensionAPI) {
               content: `
                 You are in Plan Mode and you are to draft a plan.
                 You MUST NOT make any file changes.
+                To CREATE a new plan you MUST use the "create_plan" tool.
+                To EDIT an existing plan you MUST use the "edit_plan" tool.
+                To LIST current plans, you MUST use the "list_plan" tool.
+                To READ a plan, you MUST use the "get_plan" tool.
                 All your actions, commands, and scripts MUST be readonly.
                 When drafting this plan:
-                  - You MUST NOT make any edits
+                  - You MUST NOT make any edits unless its via the "edit_plan" tool
                   - When exploring the codebase, you MUST use an Explore Agent via the Agent tool.
                   - If there are any ambiguities in the plan, you MUST clarify with the user.
                   - When your plan is complete, you MUST ask the user if they would like to execute on the plan.
