@@ -13,7 +13,7 @@ import { handleTruncation } from "./truncation";
 import { Key, Markdown, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
 import { hexAnsi } from "./format";
 import { transformGrepCommands, transformFindCommands } from "./transform";
-import { createPlan, deletePlan, getPlan, listPlans, editPlan, getPlanTitle } from "./plans";
+import { createPlan, deletePlan, getPlan, listPlans, editPlan, getPlanTitle, formatRelativeTime } from "./plans";
 
 
 enum AIMode {
@@ -133,8 +133,13 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
+      const optionToId = new Map<string, string>();
       const options = [
-        ...plans.map((p) => `${p.id} — ${p.title}`),
+        ...plans.map((p) => {
+          const label = `${p.title} — ${formatRelativeTime(p.updatedAt)}`;
+          optionToId.set(label, p.id);
+          return label;
+        }),
         "Exit",
       ];
 
@@ -145,8 +150,8 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      // Extract plan ID from the selected option
-      const planId = selected.split(" — ")[0];
+      // Look up plan ID from the selected option label
+      const planId = optionToId.get(selected);
       const plan = plans.find((p) => p.id === planId);
       const planTitle = plan?.title ?? planId;
 
@@ -520,7 +525,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       const resultText = plans
-        .map((p) => `- **${p.id}**: ${p.title}`)
+        .map((p) => `- ${p.title} — ${formatRelativeTime(p.updatedAt)}`)
         .join("\n");
 
       return {

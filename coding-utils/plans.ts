@@ -4,7 +4,7 @@
  * Plans are stored as markdown files in <workspace>/.pi/plans/plan.<ID>.md
  * The title of a plan is the first heading (# or ##) in its markdown content.
  */
-import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
@@ -57,7 +57,7 @@ export async function getPlan(
  */
 export async function listPlans(
   cwd: string
-): Promise<{ id: string; title: string }[]> {
+): Promise<{ id: string; title: string; updatedAt: number }[]> {
   const plansDir = getPlanDir(cwd);
   let files: string[];
   try {
@@ -66,7 +66,7 @@ export async function listPlans(
     return [];
   }
 
-  const results: { id: string; title: string }[] = [];
+  const results: { id: string; title: string; updatedAt: number }[] = [];
   const planRegex = /^plan\.(.+)\.md$/;
 
   for (const file of files) {
@@ -77,15 +77,37 @@ export async function listPlans(
     try {
       const content = await readFile(join(plansDir, file), "utf8");
       const title = getPlanTitle(content) ?? planId;
-      results.push({ id: planId, title });
+      const stats = await stat(join(plansDir, file));
+      results.push({ id: planId, title, updatedAt: stats.mtimeMs });
     } catch {
       // Skip files that can't be read
     }
   }
 
-  // Sort by id for consistent ordering
-  results.sort((a, b) => a.id.localeCompare(b.id));
+  // Sort by mtime descending (latest edit first), tiebreak by id
+  results.sort((a, b) => {
+    const diff = b.updatedAt - a.updatedAt;
+    if (diff !== 0) return diff > 0 ? 1 : -1;
+    return a.id.localeCompare(b.id);
+  });
   return results;
+}
+
+/**
+ * Formats a timestamp (ms since epoch) as a relative time string.
+ * Returns e.g. "30 secs ago", "3 mins ago", "1 hour ago", "2 days ago".
+ */
+export function formatRelativeTime(timestampMs: number): string {
+  const diffMs = Date.now() - timestampMs;
+  const seconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
+  if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+  if (minutes > 0) return `${minutes} min${minutes > 1 ? "s" : ""} ago`;
+  return `${seconds} sec${seconds !== 1 ? "s" : ""} ago`;
 }
 
 /**
