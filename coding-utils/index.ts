@@ -173,7 +173,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       // Show plan content in a scrollable markdown viewer starting at the top
-      await ctx.ui.custom<void>(
+      const comment = await ctx.ui.custom<string | undefined>(
         (tui, theme, _kb, done) => {
           const markdownTheme =
             getMarkdownTheme(theme);
@@ -184,6 +184,9 @@ export default function (pi: ExtensionAPI) {
             markdownTheme
           );
           let scrollOffset = 0;
+          let commentText = "";
+          let isInputMode = false;
+          const inputAreaLines = 4;
           let cachedLines: string[] | undefined;
           let renderedWidth = 0;
 
@@ -194,9 +197,50 @@ export default function (pi: ExtensionAPI) {
 
           function handleInput(data: string) {
             if (matchesKey(data, Key.escape)) {
+              if (isInputMode) {
+                isInputMode = false;
+                refresh();
+                return;
+              }
               done(undefined);
               return;
             }
+
+            if (matchesKey(data, Key.tab)) {
+              isInputMode = !isInputMode;
+              refresh();
+              return;
+            }
+
+            if (isInputMode) {
+              if (matchesKey(data, Key.enter)) {
+                if (commentText.trim()) {
+                  done(commentText);
+                }
+                return;
+              }
+              if (data === "shift+enter") {
+                commentText += "\n";
+                refresh();
+                return;
+              }
+              if (matchesKey(data, Key.backspace)) {
+                commentText = commentText.slice(
+                  0,
+                  -1
+                );
+                refresh();
+                return;
+              }
+              if (data.length === 1) {
+                commentText += data;
+                refresh();
+                return;
+              }
+              return;
+            }
+
+            // Scroll mode
             if (matchesKey(data, Key.up)) {
               scrollOffset = Math.max(
                 0,
@@ -208,7 +252,7 @@ export default function (pi: ExtensionAPI) {
             if (matchesKey(data, Key.down)) {
               const viewportHeight = Math.max(
                 1,
-                tui.terminal.rows - 5
+                tui.terminal.rows - 5 - inputAreaLines
               );
               const maxScroll = Math.max(
                 0,
@@ -234,7 +278,7 @@ export default function (pi: ExtensionAPI) {
             renderedWidth = renderWidth;
             const viewportHeight = Math.max(
               1,
-              tui.terminal.rows - 5
+              tui.terminal.rows - 5 - inputAreaLines
             );
             const trunc = (line: string) =>
               truncateToWidth(line, renderWidth);
@@ -287,6 +331,35 @@ export default function (pi: ExtensionAPI) {
               );
             }
 
+            // Input area
+            lines.push(
+              trunc(
+                "─".repeat(renderWidth)
+              )
+            );
+            const modeIndicator = isInputMode
+              ? "🔤"
+              : "💬";
+            const hint = isInputMode
+              ? "Type comment • Enter to send • Shift+Enter newline • Tab/Esc to scroll"
+              : "Tab to type comment • ↑↓ scroll • Esc to close";
+            lines.push(
+              trunc(
+                `${modeIndicator}  ${hint}`
+              )
+            );
+            const displayText = isInputMode
+              ? (commentText || " ")
+              : (commentText
+                ? commentText
+                : "(press Tab to start typing)");
+            const cursor = isInputMode
+              ? theme.fg("accent", "█")
+              : "";
+            lines.push(
+              trunc(`> ${displayText}${cursor}`)
+            );
+
             cachedLines = lines;
             return lines;
           }
@@ -300,6 +373,10 @@ export default function (pi: ExtensionAPI) {
           };
         }
       );
+
+      if (comment) {
+        pi.sendUserMessage(comment);
+      }
     },
   });
   pi.registerCommand("plan_delete", {
