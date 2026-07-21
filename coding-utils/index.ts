@@ -9,6 +9,7 @@ import {
 import { Type } from "typebox";
 import { isSafeCommand } from "./utils";
 import { handleTruncation } from "./truncation";
+import { Key, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
 import { hexAnsi } from "./format";
 import { transformGrepCommands, transformFindCommands } from "./transform";
 import { createPlan, getPlan, listPlans, editPlan } from "./plans";
@@ -156,20 +157,126 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      ctx.ui.setWidget(
-        "plan-content",
-        [
-          hexAnsi("#ED8936")(
-            `📄 ${planTitle}  (${planId})`
-          ),
-          hexAnsi("#575757")("─".repeat(60)),
-          ...planContent.split("\n"),
-        ],
-        { placement: "aboveEditor" }
-      );
-      ctx.ui.notify(
-        `Showing plan "${planTitle}" (${planId})`,
-        "info"
+      if (ctx.mode !== "tui") {
+        ctx.ui.notify(
+          `Plan "${planTitle}" (${planId}):\n\n${planContent}`,
+          "info"
+        );
+        return;
+      }
+
+      // Show plan content in a scrollable viewer starting at the top
+      await ctx.ui.custom<void>(
+        (tui, _theme, _kb, done) => {
+          const contentLines =
+            planContent.split("\n");
+          let scrollOffset = 0;
+          let cachedLines: string[] | undefined;
+
+          function refresh() {
+            cachedLines = undefined;
+            tui.requestRender();
+          }
+
+          function handleInput(data: string) {
+            if (matchesKey(data, Key.escape)) {
+              done(undefined);
+              return;
+            }
+            if (matchesKey(data, Key.up)) {
+              scrollOffset = Math.max(
+                0,
+                scrollOffset - 1
+              );
+              refresh();
+              return;
+            }
+            if (matchesKey(data, Key.down)) {
+              const viewportHeight = Math.max(
+                1,
+                tui.terminal.rows - 6
+              );
+              scrollOffset = Math.min(
+                Math.max(
+                  0,
+                  contentLines.length - viewportHeight
+                ),
+                scrollOffset + 1
+              );
+              refresh();
+              return;
+            }
+          }
+
+          function render(width: number): string[] {
+            if (cachedLines) return cachedLines;
+
+            const renderWidth = Math.max(
+              1,
+              width
+            );
+            const viewportHeight = Math.max(
+              1,
+              tui.terminal.rows - 6
+            );
+            const trunc = (line: string) =>
+              truncateToWidth(line, renderWidth);
+
+            const lines: string[] = [];
+
+            // Title
+            const title = `📄 ${planTitle}  (${planId})`;
+            lines.push(trunc(title));
+            lines.push(
+              trunc(
+                "─".repeat(renderWidth)
+              )
+            );
+
+            // Content
+            const visible = contentLines.slice(
+              scrollOffset,
+              scrollOffset + viewportHeight
+            );
+            for (const line of visible) {
+              lines.push(trunc(line));
+            }
+
+            // Scroll indicator
+            const totalLines =
+              contentLines.length;
+            const maxScroll = Math.max(
+              0,
+              totalLines - viewportHeight
+            );
+            if (maxScroll > 0) {
+              lines.push(
+                trunc(
+                  "─".repeat(renderWidth)
+                )
+              );
+              lines.push(
+                trunc(
+                  `↑↓ scroll • line ${scrollOffset + 1}-${Math.min(
+                    scrollOffset + viewportHeight,
+                    totalLines
+                  )} of ${totalLines} • Esc to close`
+                )
+              );
+            }
+
+            cachedLines = lines;
+            return lines;
+          }
+
+          return {
+            render,
+            invalidate: () => {
+              cachedLines = undefined;
+            },
+            handleInput,
+          };
+        }
       );
     },
   });
