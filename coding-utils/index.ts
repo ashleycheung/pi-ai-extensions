@@ -2,22 +2,15 @@
  * This extension add some code utils to make programming easier
  */
 import {
-  DEFAULT_MAX_BYTES,
-  DEFAULT_MAX_LINES,
-  formatSize,
-  truncateHead,
   type ExtensionAPI,
   type ToolCallEvent,
   type ToolCallEventResult,
-  withFileMutationQueue,
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
 import { isSafeCommand } from "./utils";
-
-const IGNORE_DIRS = ["node_modules", "dist", "build"];
+import { handleTruncation } from "./truncation";
+import { hexAnsi } from "./format";
+import { transformGrepCommands, transformFindCommands } from "./transform";
 
 enum AIMode {
   None = "none",
@@ -66,7 +59,7 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.notify(`Changed to Plan Mode`, "info");
     },
   });
-  pi.on("before_agent_start", async () => {
+  pi.on("before_agent_start" as any, async () => {
     switch (mode) {
       case AIMode.Execute: {
         if (!hasSentInitialModeMessage) {
@@ -262,79 +255,4 @@ export default function (pi: ExtensionAPI) {
       }
     }
   );
-}
-
-// ╔══════════════════════════════════╗
-// ║        Utility Functions         ║
-// ╚══════════════════════════════════╝
-
-/**
- * Truncates a really long response
- */
-async function handleTruncation(contents: string) {
-  // Apply truncation
-  const truncation = truncateHead(contents, {
-    maxLines: DEFAULT_MAX_LINES,
-    maxBytes: DEFAULT_MAX_BYTES,
-  });
-
-  let resultText = truncation.content;
-
-  if (truncation.truncated) {
-    // Save full output to a temp file so LLM can access it if needed
-    const tempDir = await mkdtemp(join(tmpdir(), "pi-rg-"));
-    const tempFile = join(tempDir, "output.txt");
-    await withFileMutationQueue(tempFile, async () => {
-      await writeFile(tempFile, contents, "utf8");
-    });
-
-    // Add truncation notice - this helps the LLM understand the output is incomplete
-    const truncatedLines = truncation.totalLines - truncation.outputLines;
-    const truncatedBytes = truncation.totalBytes - truncation.outputBytes;
-
-    resultText += `\n\n[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines`;
-    resultText += ` (${formatSize(truncation.outputBytes)} of ${formatSize(
-      truncation.totalBytes
-    )}).`;
-    resultText += ` ${truncatedLines} lines (${formatSize(
-      truncatedBytes
-    )}) omitted.`;
-    resultText += ` Full output saved to: ${tempFile}]`;
-  }
-  return resultText;
-}
-
-/**
- * Exclude all the directories from grep
- */
-function transformGrepCommands(bash: string) {
-  let transformedBash = bash;
-  transformedBash = transformedBash.replace(
-    /\bgrep\b/g,
-    `grep ${IGNORE_DIRS.map((dir) => `--exclude-dir=${dir}`).join(" ")}`
-  );
-  return transformedBash;
-}
-
-/**
- * Add exclude directories to find
- */
-function transformFindCommands(bash: string) {
-  let transformedBash = bash;
-  transformedBash = transformedBash.replace(
-    /\bfind \S+(?=\s+-|\s+\||$)/g,
-    (match) =>
-      `${match} ${IGNORE_DIRS.map((dir) => `-name "${dir}" -prune -o`).join(
-        " "
-      )}`
-  );
-  return transformedBash;
-}
-
-function hexAnsi(hex: string) {
-  const n = parseInt(hex.replace("#", ""), 16);
-  const r = (n >> 16) & 255,
-    g = (n >> 8) & 255,
-    b = n & 255;
-  return (text: string) => `\x1b[38;2;${r};${g};${b}m${text}\x1b[0m`;
 }
