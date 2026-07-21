@@ -122,7 +122,7 @@ export default function (pi: ExtensionAPI) {
       }
     }
   });
-  pi.registerCommand("plan_list", {
+  pi.registerCommand("list_plans", {
     description:
       "Lists all plans in an interactive selector",
     handler: async (args, ctx) => {
@@ -411,7 +411,7 @@ export default function (pi: ExtensionAPI) {
       }
     },
   });
-  pi.registerCommand("plan_delete", {
+  pi.registerCommand("delete_plan", {
     description:
       "Deletes a plan after confirmation",
     handler: async (args, ctx) => {
@@ -422,9 +422,12 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      const options = plans.map(
-        (p) => `${p.id} — ${p.title}`
-      );
+      const optionToId = new Map<string, string>();
+      const options = plans.map((p) => {
+        const label = `${p.title} — ${formatRelativeTime(p.updatedAt)}`;
+        optionToId.set(label, p.id);
+        return label;
+      });
 
       const selected = await ctx.ui.select(
         "🗑 Delete plan",
@@ -439,7 +442,7 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      const planId = selected.split(" — ")[0];
+      const planId = optionToId.get(selected);
       const plan = plans.find(
         (p) => p.id === planId
       );
