@@ -13,6 +13,7 @@ import { hexAnsi } from "./format";
 import { transformGrepCommands, transformFindCommands } from "./transform";
 import { createPlan, getPlan, listPlans, editPlan } from "./plans";
 
+
 enum AIMode {
   None = "none",
   Execute = "execute",
@@ -112,33 +113,62 @@ export default function (pi: ExtensionAPI) {
                 You are in Plan Mode.
                 You MUST NOT make any edits or file changes
               `,
+            display: showModeMessage,
           },
-          display: showModeMessage,
         };
       }
     }
   });
   pi.registerCommand("list_plans", {
-    description: "Lists all plans in a widget showing id + title",
+    description:
+      "Lists all plans in an interactive selector",
     handler: async (args, ctx) => {
       const plans = await listPlans(ctx.cwd);
 
       if (plans.length === 0) {
         ctx.ui.notify("No plans found", "info");
-        ctx.ui.setWidget("plan-list", undefined);
         return;
       }
 
-      const widgetTitle = hexAnsi("#ED8936")(`📋 Plans (${plans.length})`);
-      const planLines = plans.map(
-        (p) => `  ${hexAnsi("#A78BFA")(p.id)}: ${p.title}`
-      );
+      const options = [
+        ...plans.map((p) => `${p.id} — ${p.title}`),
+        "Exit",
+      ];
 
-      ctx.ui.setWidget("plan-list", [widgetTitle, ...planLines], {
-        placement: "aboveEditor",
-      });
+      const selected = await ctx.ui.select("📋 Plans", options);
+
+      if (!selected || selected === "Exit") {
+        ctx.ui.notify("Plan selection cancelled", "info");
+        return;
+      }
+
+      // Extract plan ID from the selected option
+      const planId = selected.split(" — ")[0];
+      const plan = plans.find((p) => p.id === planId);
+      const planTitle = plan?.title ?? planId;
+
+      const planContent = await getPlan(ctx.cwd, planId);
+      if (planContent === undefined) {
+        ctx.ui.notify(
+          `Plan "${planId}" not found`,
+          "error"
+        );
+        return;
+      }
+
+      ctx.ui.setWidget(
+        "plan-content",
+        [
+          hexAnsi("#ED8936")(
+            `📄 ${planTitle}  (${planId})`
+          ),
+          hexAnsi("#575757")("─".repeat(60)),
+          ...planContent.split("\n"),
+        ],
+        { placement: "aboveEditor" }
+      );
       ctx.ui.notify(
-        `Listed ${plans.length} plan${plans.length === 1 ? "" : "s"} in widget`,
+        `Showing plan "${planTitle}" (${planId})`,
         "info"
       );
     },
