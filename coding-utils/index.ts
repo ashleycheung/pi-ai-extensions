@@ -13,7 +13,7 @@ import { handleTruncation } from "./truncation";
 import { Key, Markdown, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
 import { hexAnsi } from "./format";
 import { transformGrepCommands, transformFindCommands } from "./transform";
-import { createPlan, getPlan, listPlans, editPlan } from "./plans";
+import { createPlan, deletePlan, getPlan, listPlans, editPlan } from "./plans";
 
 
 enum AIMode {
@@ -294,6 +294,67 @@ export default function (pi: ExtensionAPI) {
           };
         }
       );
+    },
+  });
+  pi.registerCommand("plan_delete", {
+    description:
+      "Deletes a plan after confirmation",
+    handler: async (args, ctx) => {
+      const plans = await listPlans(ctx.cwd);
+
+      if (plans.length === 0) {
+        ctx.ui.notify("No plans to delete", "info");
+        return;
+      }
+
+      const options = plans.map(
+        (p) => `${p.id} — ${p.title}`
+      );
+
+      const selected = await ctx.ui.select(
+        "🗑 Delete plan",
+        options
+      );
+
+      if (!selected) {
+        ctx.ui.notify(
+          "Plan deletion cancelled",
+          "info"
+        );
+        return;
+      }
+
+      const planId = selected.split(" — ")[0];
+      const plan = plans.find(
+        (p) => p.id === planId
+      );
+      const planTitle = plan?.title ?? planId;
+
+      const confirmed = await ctx.ui.confirm(
+        "Delete plan?",
+        `Are you sure you want to delete "${planTitle}" (${planId})?`
+      );
+
+      if (!confirmed) {
+        ctx.ui.notify(
+          "Plan deletion cancelled",
+          "info"
+        );
+        return;
+      }
+
+      const deleted = await deletePlan(ctx.cwd, planId);
+      if (deleted) {
+        ctx.ui.notify(
+          `Deleted plan "${planTitle}" (${planId})`,
+          "info"
+        );
+      } else {
+        ctx.ui.notify(
+          `Plan "${planId}" not found`,
+          "error"
+        );
+      }
     },
   });
   pi.registerTool({

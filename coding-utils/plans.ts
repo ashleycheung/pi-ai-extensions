@@ -4,7 +4,7 @@
  * Plans are stored as markdown files in <workspace>/.pi/plans/plan.<ID>.md
  * The title of a plan is the first heading (# or ##) in its markdown content.
  */
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import {
@@ -104,6 +104,22 @@ export async function createPlan(
   await writeFile(planFilePath(cwd, planId), content, "utf8");
 
   return planId;
+}
+
+/**
+ * Deletes a plan file by its ID.
+ * Returns `true` if the plan was deleted, `false` if it didn't exist.
+ */
+export async function deletePlan(
+  cwd: string,
+  planId: string
+): Promise<boolean> {
+  try {
+    await unlink(planFilePath(cwd, planId));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
