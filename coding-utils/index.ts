@@ -2,6 +2,7 @@
  * This extension add some code utils to make programming easier
  */
 import {
+  getMarkdownTheme,
   type ExtensionAPI,
   type ToolCallEvent,
   type ToolCallEventResult,
@@ -9,7 +10,7 @@ import {
 import { Type } from "typebox";
 import { isSafeCommand } from "./utils";
 import { handleTruncation } from "./truncation";
-import { Key, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import { Key, Markdown, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
 import { hexAnsi } from "./format";
 import { transformGrepCommands, transformFindCommands } from "./transform";
 import { createPlan, getPlan, listPlans, editPlan } from "./plans";
@@ -165,13 +166,20 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      // Show plan content in a scrollable viewer starting at the top
+      // Show plan content in a scrollable markdown viewer starting at the top
       await ctx.ui.custom<void>(
-        (tui, _theme, _kb, done) => {
-          const contentLines =
-            planContent.split("\n");
+        (tui, theme, _kb, done) => {
+          const markdownTheme =
+            getMarkdownTheme(theme);
+          const markdown = new Markdown(
+            planContent,
+            0,  // paddingX
+            0,  // paddingY
+            markdownTheme
+          );
           let scrollOffset = 0;
           let cachedLines: string[] | undefined;
+          let renderedWidth = 0;
 
           function refresh() {
             cachedLines = undefined;
@@ -194,13 +202,15 @@ export default function (pi: ExtensionAPI) {
             if (matchesKey(data, Key.down)) {
               const viewportHeight = Math.max(
                 1,
-                tui.terminal.rows - 6
+                tui.terminal.rows - 5
+              );
+              const maxScroll = Math.max(
+                0,
+                markdown.render(renderedWidth)
+                  .length - viewportHeight
               );
               scrollOffset = Math.min(
-                Math.max(
-                  0,
-                  contentLines.length - viewportHeight
-                ),
+                maxScroll,
                 scrollOffset + 1
               );
               refresh();
@@ -215,12 +225,18 @@ export default function (pi: ExtensionAPI) {
               1,
               width
             );
+            renderedWidth = renderWidth;
             const viewportHeight = Math.max(
               1,
-              tui.terminal.rows - 6
+              tui.terminal.rows - 5
             );
             const trunc = (line: string) =>
               truncateToWidth(line, renderWidth);
+
+            // Re-render markdown at the current width
+            markdown.invalidate();
+            const fullLines =
+              markdown.render(renderWidth);
 
             const lines: string[] = [];
 
@@ -233,8 +249,8 @@ export default function (pi: ExtensionAPI) {
               )
             );
 
-            // Content
-            const visible = contentLines.slice(
+            // Content (rendered by Markdown component)
+            const visible = fullLines.slice(
               scrollOffset,
               scrollOffset + viewportHeight
             );
@@ -244,7 +260,7 @@ export default function (pi: ExtensionAPI) {
 
             // Scroll indicator
             const totalLines =
-              contentLines.length;
+              fullLines.length;
             const maxScroll = Math.max(
               0,
               totalLines - viewportHeight
