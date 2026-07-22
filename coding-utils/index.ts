@@ -10,11 +10,24 @@ import {
 import { Type } from "typebox";
 import { isSafeCommand } from "./utils";
 import { handleTruncation } from "./truncation";
-import { Editor, Key, Markdown, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import {
+  Editor,
+  Key,
+  Markdown,
+  matchesKey,
+  truncateToWidth,
+} from "@mariozechner/pi-tui";
 import { hexAnsi } from "./format";
 import { transformGrepCommands, transformFindCommands } from "./transform";
-import { createPlan, deletePlan, getPlan, listPlans, editPlan, getPlanTitle, formatRelativeTime } from "./plans";
-
+import {
+  createPlan,
+  deletePlan,
+  getPlan,
+  listPlans,
+  editPlan,
+  getPlanTitle,
+  formatRelativeTime,
+} from "./plans";
 
 enum AIMode {
   None = "none",
@@ -123,8 +136,7 @@ export default function (pi: ExtensionAPI) {
     }
   });
   pi.registerCommand("list_plans", {
-    description:
-      "Lists all plans in an interactive selector",
+    description: "Lists all plans in an interactive selector",
     handler: async (args, ctx) => {
       const plans = await listPlans(ctx.cwd);
 
@@ -157,10 +169,7 @@ export default function (pi: ExtensionAPI) {
 
       const planContent = await getPlan(ctx.cwd, planId);
       if (planContent === undefined) {
-        ctx.ui.notify(
-          `Plan "${planId}" not found`,
-          "error"
-        );
+        ctx.ui.notify(`Plan "${planId}" not found`, "error");
         return;
       }
 
@@ -175,12 +184,11 @@ export default function (pi: ExtensionAPI) {
       // Show plan content in a scrollable markdown viewer starting at the top
       const comment = await ctx.ui.custom<string | undefined>(
         (tui, theme, _kb, done) => {
-          const markdownTheme =
-            getMarkdownTheme(theme);
+          const markdownTheme = getMarkdownTheme(theme);
           const markdown = new Markdown(
             planContent,
-            0,  // paddingX
-            0,  // paddingY
+            0, // paddingX
+            0, // paddingY
             markdownTheme
           );
           let scrollOffset = 0;
@@ -227,10 +235,7 @@ export default function (pi: ExtensionAPI) {
 
             // Scroll mode
             if (matchesKey(data, Key.up)) {
-              scrollOffset = Math.max(
-                0,
-                scrollOffset - 1
-              );
+              scrollOffset = Math.max(0, scrollOffset - 1);
               refresh();
               return;
             }
@@ -238,10 +243,7 @@ export default function (pi: ExtensionAPI) {
               const editorLineCount = Math.min(
                 maxEditorLines,
                 editor.getText()
-                  ? Math.max(
-                      1,
-                      editor.getLines(renderedWidth - 2).length
-                    )
+                  ? Math.max(1, editor.getLines(renderedWidth - 2).length)
                   : 1
               );
               const inputAreaLines = 3 + editorLineCount;
@@ -251,13 +253,9 @@ export default function (pi: ExtensionAPI) {
               );
               const maxScroll = Math.max(
                 0,
-                markdown.render(renderedWidth)
-                  .length - viewportHeight
+                markdown.render(renderedWidth).length - viewportHeight
               );
-              scrollOffset = Math.min(
-                maxScroll,
-                scrollOffset + 1
-              );
+              scrollOffset = Math.min(maxScroll, scrollOffset + 1);
               refresh();
               return;
             }
@@ -266,20 +264,14 @@ export default function (pi: ExtensionAPI) {
           function render(width: number): string[] {
             if (cachedLines) return cachedLines;
 
-            const renderWidth = Math.max(
-              1,
-              width
-            );
+            const renderWidth = Math.max(1, width);
             renderedWidth = renderWidth;
 
             // Calculate editor lines to determine viewport
             const editorLineCount = Math.min(
               maxEditorLines,
               editor.getText()
-                ? Math.max(
-                    1,
-                    editor.getLines(renderWidth - 2).length
-                  )
+                ? Math.max(1, editor.getLines(renderWidth - 2).length)
                 : 1
             );
             const inputAreaLines = 3 + editorLineCount;
@@ -287,24 +279,18 @@ export default function (pi: ExtensionAPI) {
               1,
               tui.terminal.rows - 5 - inputAreaLines
             );
-            const trunc = (line: string) =>
-              truncateToWidth(line, renderWidth);
+            const trunc = (line: string) => truncateToWidth(line, renderWidth);
 
             // Re-render markdown at the current width
             markdown.invalidate();
-            const fullLines =
-              markdown.render(renderWidth);
+            const fullLines = markdown.render(renderWidth);
 
             const lines: string[] = [];
 
             // Title
             const title = `📄 ${planTitle}  (${planId})`;
             lines.push(trunc(title));
-            lines.push(
-              trunc(
-                "─".repeat(renderWidth)
-              )
-            );
+            lines.push(trunc("─".repeat(renderWidth)));
 
             // Content (rendered by Markdown component)
             const visible = fullLines.slice(
@@ -316,18 +302,10 @@ export default function (pi: ExtensionAPI) {
             }
 
             // Scroll indicator
-            const totalLines =
-              fullLines.length;
-            const maxScroll = Math.max(
-              0,
-              totalLines - viewportHeight
-            );
+            const totalLines = fullLines.length;
+            const maxScroll = Math.max(0, totalLines - viewportHeight);
             if (maxScroll > 0) {
-              lines.push(
-                trunc(
-                  "─".repeat(renderWidth)
-                )
-              );
+              lines.push(trunc("─".repeat(renderWidth)));
               lines.push(
                 trunc(
                   `↑↓ scroll • line ${scrollOffset + 1}-${Math.min(
@@ -339,56 +317,35 @@ export default function (pi: ExtensionAPI) {
             }
 
             // Input area
-            lines.push(
-              trunc(
-                "─".repeat(renderWidth)
-              )
-            );
-            const modeIndicator = isInputMode
-              ? "🔤"
-              : "💬";
+            lines.push(trunc("─".repeat(renderWidth)));
+            const modeIndicator = isInputMode ? "🔤" : "💬";
             const hint = isInputMode
               ? "Enter to send • Shift+Enter newline • Tab/Esc to scroll"
               : "Tab to type comment • ↑↓ scroll • Esc to close";
-            lines.push(
-              trunc(
-                `${modeIndicator}  ${hint}`
-              )
-            );
+            lines.push(trunc(`${modeIndicator}  ${hint}`));
 
             // Render editor content (with line limit)
             if (isInputMode || editor.getText()) {
-              const editorWidth = Math.max(
-                1,
-                renderWidth - 2
+              const editorWidth = Math.max(1, renderWidth - 2);
+              const allEditorLines = editor.getLines(editorWidth);
+              const visibleEditorLines = allEditorLines.slice(
+                0,
+                maxEditorLines
               );
-              const allEditorLines =
-                editor.getLines(editorWidth);
-              const visibleEditorLines =
-                allEditorLines.slice(
-                  0,
-                  maxEditorLines
-                );
               for (const line of visibleEditorLines) {
-                lines.push(
-                  trunc(` ${line}`)
-                );
+                lines.push(trunc(` ${line}`));
               }
-              if (
-                allEditorLines.length > maxEditorLines
-              ) {
+              if (allEditorLines.length > maxEditorLines) {
                 lines.push(
                   trunc(
-                    ` ⤶ ${allEditorLines.length - maxEditorLines} more line${allEditorLines.length - maxEditorLines !== 1 ? "s" : ""}`
+                    ` ⤶ ${allEditorLines.length - maxEditorLines} more line${
+                      allEditorLines.length - maxEditorLines !== 1 ? "s" : ""
+                    }`
                   )
                 );
               }
             } else {
-              lines.push(
-                trunc(
-                  " (press Tab to start typing)"
-                )
-              );
+              lines.push(trunc(" (press Tab to start typing)"));
             }
 
             cachedLines = lines;
@@ -412,8 +369,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
   pi.registerCommand("delete_plan", {
-    description:
-      "Deletes a plan after confirmation",
+    description: "Deletes a plan after confirmation",
     handler: async (args, ctx) => {
       const plans = await listPlans(ctx.cwd);
 
@@ -429,23 +385,15 @@ export default function (pi: ExtensionAPI) {
         return label;
       });
 
-      const selected = await ctx.ui.select(
-        "🗑 Delete plan",
-        options
-      );
+      const selected = await ctx.ui.select("🗑 Delete plan", options);
 
       if (!selected) {
-        ctx.ui.notify(
-          "Plan deletion cancelled",
-          "info"
-        );
+        ctx.ui.notify("Plan deletion cancelled", "info");
         return;
       }
 
       const planId = optionToId.get(selected);
-      const plan = plans.find(
-        (p) => p.id === planId
-      );
+      const plan = plans.find((p) => p.id === planId);
       const planTitle = plan?.title ?? planId;
 
       const confirmed = await ctx.ui.confirm(
@@ -454,110 +402,16 @@ export default function (pi: ExtensionAPI) {
       );
 
       if (!confirmed) {
-        ctx.ui.notify(
-          "Plan deletion cancelled",
-          "info"
-        );
+        ctx.ui.notify("Plan deletion cancelled", "info");
         return;
       }
 
       const deleted = await deletePlan(ctx.cwd, planId);
       if (deleted) {
-        ctx.ui.notify(
-          `Deleted plan "${planTitle}" (${planId})`,
-          "info"
-        );
+        ctx.ui.notify(`Deleted plan "${planTitle}" (${planId})`, "info");
       } else {
-        ctx.ui.notify(
-          `Plan "${planId}" not found`,
-          "error"
-        );
+        ctx.ui.notify(`Plan "${planId}" not found`, "error");
       }
-    },
-  });
-  pi.registerTool({
-    name: "search_files",
-    label: "Search files",
-    description:
-      "Searches for files that has filename matching the search string",
-    promptSnippet:
-      "Searches the for files that has filename matching the search string",
-    promptGuidelines: [
-      "You **MUST** use 'search_files' tool to search for files with a filename matching the given search string",
-    ],
-    parameters: Type.Object({
-      searchText: Type.String(),
-    }),
-    async execute(toolCallId, params, signal, onUpdate, ctx): Promise<any> {
-      // Check for cancellation
-      if (signal?.aborted) {
-        return { content: [{ type: "text", text: "Cancelled" }] };
-      }
-
-      // Stream progress updates
-      onUpdate?.({
-        content: [{ type: "text", text: "Searching files" }],
-        details: { progress: 50 },
-      });
-
-      const result = await pi.exec("fd", [params.searchText]);
-
-      const output = result.stdout.trim();
-      if (!output) {
-        if (result.code !== 0) {
-          const err =
-            result.stderr.trim() || `fd exited with code ${result.code}`;
-          return { content: [{ type: "text", text: `Search failed: ${err}` }] };
-        }
-        return {
-          content: [{ type: "text", text: "No files found matching pattern" }],
-        };
-      }
-
-      const resultText = await handleTruncation(result.stdout);
-
-      return { content: [{ type: "text", text: resultText }] };
-    },
-  });
-  pi.registerTool({
-    name: "search_codebase",
-    label: "Search Codebase",
-    description: "Searches the codebase for a particular text",
-    promptSnippet: "Searches the codebase for a particular text",
-    promptGuidelines: [
-      "You **MUST** use 'search_codebase' tool to search the codebase for a particular text",
-    ],
-    parameters: Type.Object({
-      searchText: Type.String(),
-    }),
-    async execute(toolCallId, params, signal, onUpdate, ctx): Promise<any> {
-      // Check for cancellation
-      if (signal?.aborted) {
-        return { content: [{ type: "text", text: "Cancelled" }] };
-      }
-
-      // Stream progress updates
-      onUpdate?.({
-        content: [{ type: "text", text: "Searching codebase..." }],
-        details: { progress: 50 },
-      });
-
-      const result = await pi.exec("rg", [params.searchText]);
-
-      // ripgrep exits 1 with empty stdout when there are no matches (not an error)
-      const output = result.stdout.trim();
-      if (!output) {
-        if (result.code !== 0 && result.code !== 1) {
-          const err =
-            result.stderr.trim() || `ripgrep exited with code ${result.code}`;
-          return { content: [{ type: "text", text: `Search failed: ${err}` }] };
-        }
-        return { content: [{ type: "text", text: "No matches found" }] };
-      }
-
-      const resultText = await handleTruncation(result.stdout);
-
-      return { content: [{ type: "text", text: resultText }] };
     },
   });
 
@@ -776,8 +630,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "plan_delete",
     label: "Plan Delete",
-    description:
-      "Deletes a saved plan by its ID after user confirmation",
+    description: "Deletes a saved plan by its ID after user confirmation",
     promptSnippet:
       "Deletes a plan file by its ID, after asking for user confirmation",
     promptGuidelines: [
@@ -800,7 +653,9 @@ export default function (pi: ExtensionAPI) {
       }
 
       onUpdate?.({
-        content: [{ type: "text", text: `Looking up plan "${params.planId}"...` }],
+        content: [
+          { type: "text", text: `Looking up plan "${params.planId}"...` },
+        ],
         details: { progress: 30 },
       });
 
@@ -832,7 +687,12 @@ export default function (pi: ExtensionAPI) {
       }
 
       onUpdate?.({
-        content: [{ type: "text", text: `Asking for confirmation to delete plan "${title}"...` }],
+        content: [
+          {
+            type: "text",
+            text: `Asking for confirmation to delete plan "${title}"...`,
+          },
+        ],
         details: { progress: 60 },
       });
 
