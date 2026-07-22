@@ -33,7 +33,29 @@ enum AIMode {
   None = "none",
   Execute = "execute",
   Plan = "plan",
+  Explore = "explore",
 }
+
+const PLAN_MODE_MESSAGE = `You are in Plan Mode and you are to draft a plan.
+You MUST NOT make any file changes.
+To CREATE a new plan you MUST use the "plan_create" tool.
+To EDIT an existing plan you MUST use the "plan_edit" tool.
+To DELETE a plan you MUST use the "plan_delete" tool (which asks for your confirmation first).
+To LIST current plans, you MUST use the "plan_list" tool.
+To READ a plan, you MUST use the "plan_get" tool.
+All your actions, commands, and scripts MUST be readonly.
+When drafting this plan:
+  - You MUST NOT make any edits unless its via the "plan_edit" tool
+  - When exploring the codebase, you MUST use an Explore Agent via the Agent tool.
+  - If there are any ambiguities in the plan, you MUST clarify with the user.
+  - When your plan is complete, you MUST ask the user if they would like to execute on the plan.`;
+
+const EXPLORE_MODE_MESSAGE = `You are in Explore Mode.
+Your aim is to EXPLORE and INVESTIGATE the users questions.
+You MUST NOT make any file changes.
+You MUST NOT EDIT or CREATE any plans.
+When exploring the codebase, you MUST use an Explore Agent via the Agent tool.`;
+
 let mode = AIMode.None;
 let hasSentInitialModeMessage = false;
 let showModeMessage = false;
@@ -76,6 +98,17 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.notify(`Changed to Plan Mode`, "info");
     },
   });
+  pi.registerCommand("explore", {
+    description: "Changes to explore mode (read-only, no plan tools)",
+    handler: async (args, ctx) => {
+      ctx.ui.setWidget(modeWidget, [hexAnsi("#3B82F6")("Explore Mode")], {
+        placement: "aboveEditor",
+      });
+      mode = AIMode.Explore;
+      hasSentInitialModeMessage = false;
+      ctx.ui.notify(`Changed to Explore Mode`, "info");
+    },
+  });
   pi.on("before_agent_start" as any, async () => {
     switch (mode) {
       case AIMode.Execute: {
@@ -96,27 +129,35 @@ export default function (pi: ExtensionAPI) {
         }
         break;
       }
+      case AIMode.Explore: {
+        if (!hasSentInitialModeMessage) {
+          hasSentInitialModeMessage = true;
+          return {
+            message: {
+              customType: "Explore Mode",
+              content: EXPLORE_MODE_MESSAGE,
+              display: showModeMessage,
+            },
+          };
+        }
+        return {
+          message: {
+            customType: "Explore Mode Nudge",
+            content: `
+              You are in Explore Mode.
+              You MUST NOT make any edits or file changes
+            `,
+            display: showModeMessage,
+          },
+        };
+      }
       case AIMode.Plan: {
         if (!hasSentInitialModeMessage) {
           hasSentInitialModeMessage = true;
           return {
             message: {
               customType: "Plan Mode",
-              content: `
-                You are in Plan Mode and you are to draft a plan.
-                You MUST NOT make any file changes.
-                To CREATE a new plan you MUST use the "plan_create" tool.
-                To EDIT an existing plan you MUST use the "plan_edit" tool.
-                To DELETE a plan you MUST use the "plan_delete" tool (which asks for your confirmation first).
-                To LIST current plans, you MUST use the "plan_list" tool.
-                To READ a plan, you MUST use the "plan_get" tool.
-                All your actions, commands, and scripts MUST be readonly.
-                When drafting this plan:
-                  - You MUST NOT make any edits unless its via the "plan_edit" tool
-                  - When exploring the codebase, you MUST use an Explore Agent via the Agent tool.
-                  - If there are any ambiguities in the plan, you MUST clarify with the user.
-                  - When your plan is complete, you MUST ask the user if they would like to execute on the plan.
-              `,
+              content: PLAN_MODE_MESSAGE,
               display: showModeMessage,
             },
           };
@@ -750,13 +791,16 @@ export default function (pi: ExtensionAPI) {
         // Bash tool
         case "bash": {
           if (
-            mode === AIMode.Plan &&
+            (mode === AIMode.Plan || mode === AIMode.Explore) &&
             !isSafeCommand(String(event.input.command))
           ) {
+            const modeName = mode === AIMode.Plan ? "Plan" : "Explore";
+            const modeMessage = mode === AIMode.Plan ? PLAN_MODE_MESSAGE : EXPLORE_MODE_MESSAGE;
+            pi.sendUserMessage(modeMessage, { deliverAs: "steer" });
             return {
               block: true,
               reason: `
-              You are in Plan Mode.
+              You are in ${modeName} Mode.
               Destructive bash commands are strictly NOT allowed.
               You must explicitly ask the user to change to execute mode to enable destructive bash commands`,
             };
@@ -785,13 +829,30 @@ export default function (pi: ExtensionAPI) {
           return newInput as any;
         }
         case "edit": {
-          if (mode === AIMode.Plan) {
+          if (mode === AIMode.Plan || mode === AIMode.Explore) {
+            const modeName = mode === AIMode.Plan ? "Plan" : "Explore";
+            const modeMessage = mode === AIMode.Plan ? PLAN_MODE_MESSAGE : EXPLORE_MODE_MESSAGE;
+            pi.sendUserMessage(modeMessage, { deliverAs: "steer" });
             return {
               block: true,
               reason: `
-              You are in Plan Mode.
+              You are in ${modeName} Mode.
               Edits are strictly NOT allowed.
               You must explicitly ask the user to change to execute mode to enable file editing`,
+            };
+          }
+        }
+        case "plan_create":
+        case "plan_edit":
+        case "plan_delete": {
+          if (mode === AIMode.Explore) {
+            pi.sendUserMessage(EXPLORE_MODE_MESSAGE, { deliverAs: "steer" });
+            return {
+              block: true,
+              reason: `
+              You are in Explore Mode.
+              You must not create, edit, or delete plans.
+              You must explicitly ask the user to change to another mode to modify plans`,
             };
           }
         }
