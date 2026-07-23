@@ -3,7 +3,7 @@ import {
   type ToolCallEvent,
   type ToolCallEventResult,
 } from "@mariozechner/pi-coding-agent";
-import { AIMode, mode, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE } from "./mode";
+import { AIMode, modeState, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE } from "./mode";
 import { isSafeCommand } from "./utils";
 import { transformGrepCommands, transformFindCommands } from "./transform";
 
@@ -15,12 +15,12 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
         // Bash tool
         case "bash": {
           if (
-            (mode === AIMode.Plan || mode === AIMode.Explore) &&
+            (modeState.mode === AIMode.Plan || modeState.mode === AIMode.Explore) &&
             !isSafeCommand(String(event.input.command))
           ) {
-            const modeName = mode === AIMode.Plan ? "Plan" : "Explore";
+            const modeName = modeState.mode === AIMode.Plan ? "Plan" : "Explore";
             const modeMessage =
-              mode === AIMode.Plan ? PLAN_MODE_MESSAGE : EXPLORE_MODE_MESSAGE;
+              modeState.mode === AIMode.Plan ? PLAN_MODE_MESSAGE : EXPLORE_MODE_MESSAGE;
             pi.sendUserMessage(modeMessage, { deliverAs: "steer" });
             return {
               block: true,
@@ -54,10 +54,10 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
           return newInput as any;
         }
         case "edit": {
-          if (mode === AIMode.Plan || mode === AIMode.Explore) {
-            const modeName = mode === AIMode.Plan ? "Plan" : "Explore";
+          if (modeState.mode === AIMode.Plan || modeState.mode === AIMode.Explore) {
+            const modeName = modeState.mode === AIMode.Plan ? "Plan" : "Explore";
             const modeMessage =
-              mode === AIMode.Plan ? PLAN_MODE_MESSAGE : EXPLORE_MODE_MESSAGE;
+              modeState.mode === AIMode.Plan ? PLAN_MODE_MESSAGE : EXPLORE_MODE_MESSAGE;
             pi.sendUserMessage(modeMessage, { deliverAs: "steer" });
             return {
               block: true,
@@ -71,7 +71,7 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
         case "plan_create":
         case "plan_edit":
         case "plan_delete": {
-          if (mode === AIMode.Explore) {
+          if (modeState.mode === AIMode.Explore) {
             pi.sendUserMessage(EXPLORE_MODE_MESSAGE, { deliverAs: "steer" });
             return {
               block: true,

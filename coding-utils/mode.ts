@@ -28,9 +28,18 @@ You MUST NOT make any file changes.
 You MUST NOT EDIT or CREATE any plans.
 When exploring the codebase, you MUST use an Explore Agent via the Agent tool.`;
 
-export let mode = AIMode.None;
-export let hasSentInitialModeMessage = false;
-export let showModeMessage = false;
+// Use a shared mutable object instead of `export let` to ensure
+// cross-module changes are visible under CommonJS transpilation.
+// Babel's plugin-transform-modules-commonjs compiles `export let` to
+// `let x = exports.x = value`, where reassignment only updates the
+// local variable but not the exports object. By keeping the object
+// reference constant (const) and only mutating its properties, other
+// modules always see the current value.
+export const modeState = {
+  mode: AIMode.None as AIMode,
+};
+let hasSentInitialModeMessage = false;
+let showModeMessage = false;
 const modeWidget = "ai-mode-widget";
 
 export function registerModeCommands(pi: ExtensionAPI) {
@@ -54,7 +63,7 @@ export function registerModeCommands(pi: ExtensionAPI) {
       ctx.ui.setWidget(modeWidget, [hexAnsi("#ED64A6")("Execute Mode")], {
         placement: "aboveEditor",
       });
-      mode = AIMode.Execute;
+      modeState.mode = AIMode.Execute;
       hasSentInitialModeMessage = false;
       ctx.ui.notify(`Changed to Execute Mode`, "info");
     },
@@ -65,7 +74,7 @@ export function registerModeCommands(pi: ExtensionAPI) {
       ctx.ui.setWidget(modeWidget, [hexAnsi("#ED8936")("Plan Mode")], {
         placement: "aboveEditor",
       });
-      mode = AIMode.Plan;
+      modeState.mode = AIMode.Plan;
       hasSentInitialModeMessage = false;
       ctx.ui.notify(`Changed to Plan Mode`, "info");
     },
@@ -76,7 +85,7 @@ export function registerModeCommands(pi: ExtensionAPI) {
       ctx.ui.setWidget(modeWidget, [hexAnsi("#3B82F6")("Explore Mode")], {
         placement: "aboveEditor",
       });
-      mode = AIMode.Explore;
+      modeState.mode = AIMode.Explore;
       hasSentInitialModeMessage = false;
       ctx.ui.notify(`Changed to Explore Mode`, "info");
     },
@@ -85,7 +94,7 @@ export function registerModeCommands(pi: ExtensionAPI) {
 
 export function registerBeforeAgentStartHandler(pi: ExtensionAPI) {
   pi.on("before_agent_start" as any, async () => {
-    switch (mode) {
+    switch (modeState.mode) {
       case AIMode.Execute: {
         if (!hasSentInitialModeMessage) {
           hasSentInitialModeMessage = true;
