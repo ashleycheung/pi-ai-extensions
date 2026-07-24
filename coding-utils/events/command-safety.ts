@@ -4,7 +4,7 @@ import {
   type ToolCallEventResult,
 } from "@mariozechner/pi-coding-agent";
 import { modeState } from "../store/mode-state";
-import { AIMode, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE, CODE_REVIEW_MESSAGE } from "../store/mode-messages";
+import { AIMode } from "../store/mode-messages";
 import { isSafeCommand } from "../utils/command-patterns";
 import { transformGrepCommands, transformFindCommands } from "../utils/transform";
 
@@ -20,9 +20,7 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
             !isSafeCommand(String(event.input.command))
           ) {
             const modeName = modeState.mode === AIMode.Plan ? "Plan" : modeState.mode === AIMode.Explore ? "Explore" : "Code Review";
-            const modeMessage =
-              modeState.mode === AIMode.Plan ? PLAN_MODE_MESSAGE : modeState.mode === AIMode.Explore ? EXPLORE_MODE_MESSAGE : CODE_REVIEW_MESSAGE;
-            pi.sendUserMessage(modeMessage, { deliverAs: "steer" });
+            pi.sendUserMessage(`You are in ${modeName} Mode. Destructive bash commands are strictly NOT allowed.`, { deliverAs: "steer" });
             return {
               block: true,
               reason: `
@@ -57,9 +55,7 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
         case "edit": {
           if (modeState.mode === AIMode.Plan || modeState.mode === AIMode.Explore || modeState.mode === AIMode.CodeReview) {
             const modeName = modeState.mode === AIMode.Plan ? "Plan" : modeState.mode === AIMode.Explore ? "Explore" : "Code Review";
-            const modeMessage =
-              modeState.mode === AIMode.Plan ? PLAN_MODE_MESSAGE : modeState.mode === AIMode.Explore ? EXPLORE_MODE_MESSAGE : CODE_REVIEW_MESSAGE;
-            pi.sendUserMessage(modeMessage, { deliverAs: "steer" });
+            pi.sendUserMessage(`You are in ${modeName} Mode. Edits are strictly NOT allowed.`, { deliverAs: "steer" });
             return {
               block: true,
               reason: `
@@ -73,9 +69,8 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
         case "plan_edit":
         case "plan_delete": {
           if (modeState.mode === AIMode.Explore || modeState.mode === AIMode.CodeReview) {
-            const modeMessage = modeState.mode === AIMode.Explore ? EXPLORE_MODE_MESSAGE : CODE_REVIEW_MESSAGE;
             const modeName = modeState.mode === AIMode.Explore ? "Explore" : "Code Review";
-            pi.sendUserMessage(modeMessage, { deliverAs: "steer" });
+            pi.sendUserMessage(`You are in ${modeName} Mode. Plan modifications are strictly NOT allowed.`, { deliverAs: "steer" });
             return {
               block: true,
               reason: `

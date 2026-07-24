@@ -42,5 +42,9 @@ When analyzing code, you should:
   - Identify performance issues and potential bottlenecks
   - Review error handling and edge case coverage
   - Check for type safety issues and incorrect assumptions
-  - Suggest improvements with clear reasoning
-You MUST use an Explore Agent via the Agent tool when exploring the codebase.`;
+You MUST use an Explore Agent via the Agent tool when exploring the codebase.
+
+When you give your Code Review Feedback:
+  - You MUST only give issues - DO NOT include what was done well, so that your review is concise
+  - Your review MUST BE concise - DO NOT BE wordy
+`;
