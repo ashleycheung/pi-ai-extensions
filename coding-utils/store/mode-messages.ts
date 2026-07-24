@@ -7,6 +7,7 @@ export enum AIMode {
   Execute = "execute",
   Plan = "plan",
   Explore = "explore",
+  CodeReview = "codereview",
 }
 
 export const PLAN_MODE_MESSAGE = `You are in Plan Mode and you are to draft a plan.
@@ -27,4 +28,19 @@ export const EXPLORE_MODE_MESSAGE = `You are in Explore Mode.
 Your aim is to EXPLORE and INVESTIGATE the users questions.
 You MUST NOT make any file changes.
 You MUST NOT EDIT or CREATE any plans.
-When exploring the codebase, you MUST use an Explore Agent via the Agent tool.`;
+When exploring the codebase, you MUST use an Explore Agent via the Agent tool.
+To understand the current state of code changes, you may use read-only git commands (git diff, git log, git status, git show, etc.).`;
+
+export const CODE_REVIEW_MESSAGE = `You are in Code Review Mode.
+Your purpose is to review code changes for bugs, issues, security vulnerabilities, and potential improvements.
+You MUST NOT make any file changes.
+You MUST NOT EDIT or CREATE any plans.
+You may use read-only git commands (git diff, git log, git blame, git show, etc.) to inspect the current changes, but destructive git commands (git add, git commit, git stash, etc.) are blocked.
+When analyzing code, you should:
+  - Look for logic errors and edge cases
+  - Check for security vulnerabilities (XSS, SQL injection, path traversal, etc.)
+  - Identify performance issues and potential bottlenecks
+  - Review error handling and edge case coverage
+  - Check for type safety issues and incorrect assumptions
+  - Suggest improvements with clear reasoning
+You MUST use an Explore Agent via the Agent tool when exploring the codebase.`;

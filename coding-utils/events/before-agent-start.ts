@@ -1,6 +1,6 @@
 import { type ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { modeState } from "../store/mode-state";
-import { AIMode, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE } from "../store/mode-messages";
+import { AIMode, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE, CODE_REVIEW_MESSAGE } from "../store/mode-messages";
 
 export function registerBeforeAgentStartHandler(pi: ExtensionAPI) {
   pi.on("before_agent_start" as any, async () => {
@@ -39,6 +39,28 @@ export function registerBeforeAgentStartHandler(pi: ExtensionAPI) {
             customType: "Explore Mode Nudge",
             content: `
               You are in Explore Mode.
+              You MUST NOT make any edits or file changes
+            `,
+            display: modeState.showModeMessage,
+          },
+        };
+      }
+      case AIMode.CodeReview: {
+        if (!modeState.hasSentInitialModeMessage) {
+          modeState.hasSentInitialModeMessage = true;
+          return {
+            message: {
+              customType: "Code Review Mode",
+              content: CODE_REVIEW_MESSAGE,
+              display: modeState.showModeMessage,
+            },
+          };
+        }
+        return {
+          message: {
+            customType: "Code Review Mode Nudge",
+            content: `
+              You are in Code Review Mode.
               You MUST NOT make any edits or file changes
             `,
             display: modeState.showModeMessage,
