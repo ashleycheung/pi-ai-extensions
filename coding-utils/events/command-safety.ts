@@ -3,9 +3,10 @@ import {
   type ToolCallEvent,
   type ToolCallEventResult,
 } from "@mariozechner/pi-coding-agent";
-import { AIMode, modeState, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE } from "./mode";
-import { isSafeCommand } from "./utils";
-import { transformGrepCommands, transformFindCommands } from "./transform";
+import { modeState } from "../store/mode-state";
+import { AIMode, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE } from "../store/mode-messages";
+import { isSafeCommand } from "../utils/command-patterns";
+import { transformGrepCommands, transformFindCommands } from "../utils/transform";
 
 export function registerCommandSafetyHandler(pi: ExtensionAPI) {
   pi.on(
