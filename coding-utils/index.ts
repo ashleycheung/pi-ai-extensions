@@ -9,6 +9,8 @@ import { registerExploreCommand } from "./commands/explore";
 import { registerCodeReviewCommand } from "./commands/code-review";
 import { registerListPlansCommand } from "./commands/list-plans";
 import { registerDeletePlanCommand } from "./commands/delete-plan";
+import { registerDiffCommand } from "./commands/diff";
+import { registerReadPlanCommand } from "./commands/read-plan";
 
 // Tools
 import { registerSearchFilesTool } from "./tools/search-files";
@@ -33,6 +35,8 @@ export default function (pi: ExtensionAPI) {
   registerCodeReviewCommand(pi);
   registerListPlansCommand(pi);
   registerDeletePlanCommand(pi);
+  registerDiffCommand(pi);
+  registerReadPlanCommand(pi);
 
   // Tools
   registerSearchFilesTool(pi);
