@@ -44,12 +44,7 @@ export function registerListPlansCommand(pi: ExtensionAPI) {
         return;
       }
 
-      // Print the plan content with markdown rendering and syntax highlighting
-      pi.sendMessage({
-        customType: "plan",
-        content: planContent,
-        display: true,
-      });
+      ctx.ui.notify(`📄 ${planTitle} (${planId})\n\n${planContent}`, "info");
     },
   });
 }
