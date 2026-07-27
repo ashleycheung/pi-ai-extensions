@@ -1,6 +1,6 @@
 import { type ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { modeState } from "../store/mode-state";
-import { AIMode, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE, CODE_REVIEW_MESSAGE } from "../store/mode-messages";
+import { AIMode, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE, CODE_REVIEW_MESSAGE, CODING_GUIDELINES_PROMPT } from "../store/mode-messages";
 
 export function registerBeforeAgentStartHandler(pi: ExtensionAPI) {
   pi.on("before_agent_start" as any, async () => {
@@ -16,7 +16,7 @@ export function registerBeforeAgentStartHandler(pi: ExtensionAPI) {
                 You MUST breakdown your task into smaller actionable tasks.
                 You MUST use TaskCreate and TaskUpdate to keep track of your progress.
                 When exploring the codebase, you MUST use an Explore Agent via the Agent tool
-              `,
+              \n${CODING_GUIDELINES_PROMPT}`,
               display: modeState.showModeMessage,
             },
           };
@@ -29,7 +29,7 @@ export function registerBeforeAgentStartHandler(pi: ExtensionAPI) {
           return {
             message: {
               customType: "Explore Mode",
-              content: EXPLORE_MODE_MESSAGE,
+              content: `${EXPLORE_MODE_MESSAGE}\n${CODING_GUIDELINES_PROMPT}`,
               display: modeState.showModeMessage,
             },
           };
@@ -73,7 +73,7 @@ export function registerBeforeAgentStartHandler(pi: ExtensionAPI) {
           return {
             message: {
               customType: "Plan Mode",
-              content: PLAN_MODE_MESSAGE,
+              content: `${PLAN_MODE_MESSAGE}\n${CODING_GUIDELINES_PROMPT}`,
               display: modeState.showModeMessage,
             },
           };
