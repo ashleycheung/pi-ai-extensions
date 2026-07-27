@@ -1,6 +1,6 @@
 # coding-utils
 
-A pi coding-agent extension that provides mode management (Execute/Plan/Explore), plan CRUD tools, plan interactive commands, and codebase search tools.
+A pi coding-agent extension that provides mode management (Execute/Plan/Ask), plan CRUD tools, plan interactive commands, and codebase search tools.
 
 ## Folder structure
 
@@ -12,7 +12,7 @@ coding-utils/
 │   ├── hide-mode-message.ts
 │   ├── execute.ts
 │   ├── plan.ts
-│   ├── explore.ts
+│   ├── ask.ts
 │   ├── list-plans.ts      # TUI-heavy plan viewer with comment editor
 │   └── delete-plan.ts
 ├── tools/                 # One file per pi.registerTool() call
@@ -25,10 +25,10 @@ coding-utils/
 │   └── plan-delete.ts
 ├── events/                # Event handler registrations
 │   ├── before-agent-start.ts   # Injects mode instructions into agent prompts
-│   └── command-safety.ts       # Blocks destructive commands in Plan/Explore modes
+│   └── command-safety.ts       # Blocks destructive commands in Plan/Ask modes
 ├── store/                 # Shared state and constants
 │   ├── mode-state.ts      # modeState object (mode, hasSentInitialModeMessage, showModeMessage)
-│   └── mode-messages.ts   # AIMode enum, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE
+│   └── mode-messages.ts   # AIMode enum, PLAN_MODE_MESSAGE, ASK_MODE_MESSAGE
 └── utils/                 # Pure utility functions (no side effects)
     ├── plans.ts           # Plan CRUD (file I/O for .pi/plans/ directory)
     ├── format.ts          # hexAnsi color conversion

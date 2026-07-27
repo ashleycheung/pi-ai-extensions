@@ -6,7 +6,7 @@ export enum AIMode {
   None = "none",
   Execute = "execute",
   Plan = "plan",
-  Explore = "explore",
+  Ask = "ask",
   CodeReview = "codereview",
 }
 
@@ -24,8 +24,8 @@ When drafting this plan:
   - If there are any ambiguities in the plan, you MUST clarify with the user.
   - When your plan is complete, you MUST ask the user if they would like to execute on the plan.`;
 
-export const EXPLORE_MODE_MESSAGE = `You are in Explore Mode.
-Your aim is to EXPLORE and INVESTIGATE the users questions.
+export const ASK_MODE_MESSAGE = `You are in Ask Mode.
+Your aim is to answer the user's questions.
 You MUST NOT make any file changes.
 You MUST NOT EDIT or CREATE any plans.
 When exploring the codebase, you MUST use an Explore Agent via the Agent tool.

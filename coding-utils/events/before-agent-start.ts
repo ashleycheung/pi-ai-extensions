@@ -1,6 +1,6 @@
 import { type ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { modeState } from "../store/mode-state";
-import { AIMode, PLAN_MODE_MESSAGE, EXPLORE_MODE_MESSAGE, CODE_REVIEW_MESSAGE, CODING_GUIDELINES_PROMPT } from "../store/mode-messages";
+import { AIMode, PLAN_MODE_MESSAGE, ASK_MODE_MESSAGE, CODE_REVIEW_MESSAGE, CODING_GUIDELINES_PROMPT } from "../store/mode-messages";
 
 export function registerBeforeAgentStartHandler(pi: ExtensionAPI) {
   pi.on("before_agent_start" as any, async () => {
@@ -23,22 +23,22 @@ export function registerBeforeAgentStartHandler(pi: ExtensionAPI) {
         }
         break;
       }
-      case AIMode.Explore: {
+      case AIMode.Ask: {
         if (!modeState.hasSentInitialModeMessage) {
           modeState.hasSentInitialModeMessage = true;
           return {
             message: {
-              customType: "Explore Mode",
-              content: `${EXPLORE_MODE_MESSAGE}\n${CODING_GUIDELINES_PROMPT}`,
+              customType: "Ask Mode",
+              content: `${ASK_MODE_MESSAGE}\n${CODING_GUIDELINES_PROMPT}`,
               display: modeState.showModeMessage,
             },
           };
         }
         return {
           message: {
-            customType: "Explore Mode Nudge",
+            customType: "Ask Mode Nudge",
             content: `
-              You are in Explore Mode.
+              You are in Ask Mode.
               You MUST NOT make any edits or file changes
             `,
             display: modeState.showModeMessage,

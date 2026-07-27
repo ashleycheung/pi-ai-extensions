@@ -5,7 +5,7 @@ import { registerShowModeMessageCommand } from "./commands/show-mode-message";
 import { registerHideModeMessageCommand } from "./commands/hide-mode-message";
 import { registerExecuteCommand } from "./commands/execute";
 import { registerPlanCommand } from "./commands/plan";
-import { registerExploreCommand } from "./commands/explore";
+import { registerAskCommand } from "./commands/ask";
 import { registerCodeReviewCommand } from "./commands/code-review";
 import { registerListPlansCommand } from "./commands/list-plans";
 import { registerDeletePlanCommand } from "./commands/delete-plan";
@@ -31,7 +31,7 @@ export default function (pi: ExtensionAPI) {
   registerHideModeMessageCommand(pi);
   registerExecuteCommand(pi);
   registerPlanCommand(pi);
-  registerExploreCommand(pi);
+  registerAskCommand(pi);
   registerCodeReviewCommand(pi);
   registerListPlansCommand(pi);
   registerDeletePlanCommand(pi);

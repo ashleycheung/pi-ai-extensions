@@ -16,10 +16,10 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
         // Bash tool
         case "bash": {
           if (
-            (modeState.mode === AIMode.Plan || modeState.mode === AIMode.Explore || modeState.mode === AIMode.CodeReview) &&
+            (modeState.mode === AIMode.Plan || modeState.mode === AIMode.Ask || modeState.mode === AIMode.CodeReview) &&
             !isSafeCommand(String(event.input.command))
           ) {
-            const modeName = modeState.mode === AIMode.Plan ? "Plan" : modeState.mode === AIMode.Explore ? "Explore" : "Code Review";
+            const modeName = modeState.mode === AIMode.Plan ? "Plan" : modeState.mode === AIMode.Ask ? "Ask" : "Code Review";
             pi.sendUserMessage(`You are in ${modeName} Mode. Destructive bash commands are strictly NOT allowed.`, { deliverAs: "steer" });
             return {
               block: true,
@@ -53,8 +53,8 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
           return newInput as any;
         }
         case "edit": {
-          if (modeState.mode === AIMode.Plan || modeState.mode === AIMode.Explore || modeState.mode === AIMode.CodeReview) {
-            const modeName = modeState.mode === AIMode.Plan ? "Plan" : modeState.mode === AIMode.Explore ? "Explore" : "Code Review";
+          if (modeState.mode === AIMode.Plan || modeState.mode === AIMode.Ask || modeState.mode === AIMode.CodeReview) {
+            const modeName = modeState.mode === AIMode.Plan ? "Plan" : modeState.mode === AIMode.Ask ? "Ask" : "Code Review";
             pi.sendUserMessage(`You are in ${modeName} Mode. Edits are strictly NOT allowed.`, { deliverAs: "steer" });
             return {
               block: true,
@@ -68,8 +68,8 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
         case "plan_create":
         case "plan_edit":
         case "plan_delete": {
-          if (modeState.mode === AIMode.Explore || modeState.mode === AIMode.CodeReview) {
-            const modeName = modeState.mode === AIMode.Explore ? "Explore" : "Code Review";
+          if (modeState.mode === AIMode.Ask || modeState.mode === AIMode.CodeReview) {
+            const modeName = modeState.mode === AIMode.Ask ? "Ask" : "Code Review";
             pi.sendUserMessage(`You are in ${modeName} Mode. Plan modifications are strictly NOT allowed.`, { deliverAs: "steer" });
             return {
               block: true,

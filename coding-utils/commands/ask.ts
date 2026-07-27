@@ -5,16 +5,16 @@ import { hexAnsi } from "../utils/format";
 
 const modeWidget = "ai-mode-widget";
 
-export function registerExploreCommand(pi: ExtensionAPI) {
-  pi.registerCommand("explore", {
-    description: "Changes to explore mode (read-only, no plan tools)",
+export function registerAskCommand(pi: ExtensionAPI) {
+  pi.registerCommand("ask", {
+    description: "Changes to ask mode (read-only, no plan tools)",
     handler: async (args, ctx) => {
-      ctx.ui.setWidget(modeWidget, [hexAnsi("#3B82F6")("Explore Mode")], {
+      ctx.ui.setWidget(modeWidget, [hexAnsi("#3B82F6")("Ask Mode")], {
         placement: "aboveEditor",
       });
-      modeState.mode = AIMode.Explore;
+      modeState.mode = AIMode.Ask;
       modeState.hasSentInitialModeMessage = false;
-      ctx.ui.notify(`Changed to Explore Mode`, "info");
+      ctx.ui.notify(`Changed to Ask Mode`, "info");
     },
   });
 }
