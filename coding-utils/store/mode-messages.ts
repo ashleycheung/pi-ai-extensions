@@ -49,9 +49,11 @@ When you give your Code Review Feedback:
   - Your review MUST BE concise - DO NOT BE wordy
 `;
 
-export const CODING_GUIDELINES_PROMPT = `Your implementation must be DRY (Don't Repeat Yourself). 
-If the function already exists or is exported by a library you MUST reuse that.
-If you create a new utility method or class, you MUST make it reusable.
+export const CODING_GUIDELINES_PROMPT = `
+Your implementation must be DRY (Don't Repeat Yourself).
+  - If the function already exists or is exported by a library you MUST reuse that.
+  - If you create a new utility method or class, you MUST make it reusable.
 
 You MUST follow the project's coding conventions.
-What package manager / monorepo solution is the project using? You MUST follow those conventions`;
+  - What package manager / monorepo solution is the project using?
+  - You MUST follow those conventions`;
