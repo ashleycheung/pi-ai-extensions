@@ -4,12 +4,12 @@ import { listPlans, formatRelativeTime } from "../utils/plans";
 
 export function registerPlanListTool(pi: ExtensionAPI) {
   pi.registerTool({
-    name: "plan_list",
+    name: "list_plans",
     label: "List Plans",
     description: "Lists all the plans with available with its id + title",
     promptSnippet: "Lists all saved plans with their IDs and titles",
     promptGuidelines: [
-      "Use plan_list to see all available plans and their titles before referencing them.",
+      "Use list_plans to see all available plans and their titles before referencing them.",
     ],
     parameters: Type.Object({}),
     async execute(toolCallId, params, signal, onUpdate, ctx): Promise<any> {
@@ -30,9 +30,7 @@ export function registerPlanListTool(pi: ExtensionAPI) {
         };
       }
 
-      const resultText = plans
-        .map((p) => `- ${p.title} — ${formatRelativeTime(p.updatedAt)}`)
-        .join("\n");
+      const resultText = plans.map((p) => `${p.title} ID: ${p.id}`).join("\n");
 
       return {
         content: [

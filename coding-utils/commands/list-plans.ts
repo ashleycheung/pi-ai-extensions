@@ -1,9 +1,5 @@
 import { type ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import {
-  listPlans,
-  getPlan,
-  formatRelativeTime,
-} from "../utils/plans";
+import { listPlans, getPlan, formatRelativeTime } from "../utils/plans";
 
 export function registerListPlansCommand(pi: ExtensionAPI) {
   pi.registerCommand("list_plans", {
@@ -19,7 +15,7 @@ export function registerListPlansCommand(pi: ExtensionAPI) {
       const optionToId = new Map<string, string>();
       const options = [
         ...plans.map((p) => {
-          const label = `${p.title} — ${formatRelativeTime(p.updatedAt)}`;
+          const label = `${p.title} - ${formatRelativeTime(p.updatedAt)}`;
           optionToId.set(label, p.id);
           return label;
         }),
@@ -38,7 +34,7 @@ export function registerListPlansCommand(pi: ExtensionAPI) {
       const plan = plans.find((p) => p.id === planId);
       const planTitle = plan?.title ?? planId;
 
-      const planContent = await getPlan(ctx.cwd, planId);
+      const planContent = await getPlan(ctx.cwd, String(planId));
       if (planContent === undefined) {
         ctx.ui.notify(`Plan "${planId}" not found`, "error");
         return;
