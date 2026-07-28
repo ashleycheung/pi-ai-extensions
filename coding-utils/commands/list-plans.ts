@@ -34,6 +34,9 @@ export function registerListPlansCommand(pi: ExtensionAPI) {
       const plan = plans.find((p) => p.id === planId);
       const planTitle = plan?.title ?? planId;
 
+      // Set the plan ID in the user's input box
+      ctx.ui.setEditorText(`[ Plan ${planId} ]\n\n`);
+
       const planContent = await getPlan(ctx.cwd, String(planId));
       if (planContent === undefined) {
         ctx.ui.notify(`Plan "${planId}" not found`, "error");
