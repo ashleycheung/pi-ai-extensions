@@ -11,6 +11,7 @@ import { registerListPlansCommand } from "./commands/list-plans";
 import { registerDeletePlanCommand } from "./commands/delete-plan";
 import { registerDiffCommand } from "./commands/diff";
 import { registerReadPlanCommand } from "./commands/read-plan";
+import { registerTogglePlanOutputCommand } from "./commands/toggle-plan-output";
 
 // Tools
 import { registerSearchFilesTool } from "./tools/search-files";
@@ -25,27 +26,39 @@ import { registerPlanDeleteTool } from "./tools/plan-delete";
 import { registerBeforeAgentStartHandler } from "./events/before-agent-start";
 import { registerCommandSafetyHandler } from "./events/command-safety";
 
-export default function (pi: ExtensionAPI) {
+// State
+import { loadPlanOutputState } from "./store/plan-output-state";
+
+const ENABLE_MODES = true;
+
+export default async function (pi: ExtensionAPI) {
+  await loadPlanOutputState();
+
   // Commands
-  registerShowModeMessageCommand(pi);
-  registerHideModeMessageCommand(pi);
-  registerExecuteCommand(pi);
-  registerPlanCommand(pi);
-  registerAskCommand(pi);
-  registerCodeReviewCommand(pi);
-  registerListPlansCommand(pi);
-  registerDeletePlanCommand(pi);
+  if (ENABLE_MODES) {
+    registerShowModeMessageCommand(pi);
+    registerHideModeMessageCommand(pi);
+    registerExecuteCommand(pi);
+    registerPlanCommand(pi);
+    registerAskCommand(pi);
+    registerCodeReviewCommand(pi);
+    registerListPlansCommand(pi);
+    registerDeletePlanCommand(pi);
+    registerReadPlanCommand(pi);
+    registerTogglePlanOutputCommand(pi);
+    registerPlanGetTool(pi);
+    registerPlanListTool(pi);
+    registerPlanCreateTool(pi);
+    registerPlanEditTool(pi);
+    registerPlanDeleteTool(pi);
+  }
+
+  // Diff
   registerDiffCommand(pi);
-  registerReadPlanCommand(pi);
 
   // Tools
   registerSearchFilesTool(pi);
   registerSearchCodebaseTool(pi);
-  registerPlanGetTool(pi);
-  registerPlanListTool(pi);
-  registerPlanCreateTool(pi);
-  registerPlanEditTool(pi);
-  registerPlanDeleteTool(pi);
 
   // Event handlers
   registerBeforeAgentStartHandler(pi);

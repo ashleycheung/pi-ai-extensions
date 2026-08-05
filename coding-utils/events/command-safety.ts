@@ -5,7 +5,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { modeState } from "../store/mode-state";
 import { AIMode } from "../store/mode-messages";
-import { isSafeCommand } from "../utils/command-patterns";
+import { getUnsafeReason } from "../utils/command-patterns";
 import { transformGrepCommands, transformFindCommands } from "../utils/transform";
 
 export function registerCommandSafetyHandler(pi: ExtensionAPI) {
@@ -15,24 +15,23 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
       switch (event.toolName) {
         // Bash tool
         case "bash": {
+          const command = String(event.input.command);
+          const unsafeReason = getUnsafeReason(command);
           if (
             (modeState.mode === AIMode.Plan || modeState.mode === AIMode.Ask || modeState.mode === AIMode.CodeReview) &&
-            !isSafeCommand(String(event.input.command))
+            unsafeReason !== undefined
           ) {
             const modeName = modeState.mode === AIMode.Plan ? "Plan" : modeState.mode === AIMode.Ask ? "Ask" : "Code Review";
-            pi.sendUserMessage(`You are in ${modeName} Mode. Destructive bash commands are strictly NOT allowed.`, { deliverAs: "steer" });
+            pi.sendUserMessage(`You are in ${modeName} Mode. This bash command is not allowed: ${unsafeReason}. You must explicitly ask the user to change to execute mode to enable it.`, { deliverAs: "steer" });
             return {
               block: true,
               reason: `
               You are in ${modeName} Mode.
-              Destructive bash commands are strictly NOT allowed.
-              You must explicitly ask the user to change to execute mode to enable destructive bash commands`,
+              This bash command is not allowed: ${unsafeReason}
+              You must explicitly ask the user to change to execute mode to enable it`,
             };
           }
 
-          const command = (event.input.command as any)?.trim() as
-            | string
-            | undefined;
           if (!command) return;
 
           let finalCommand = command;

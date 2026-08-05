@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import {
   CONFIG_DIR_NAME,
   createEditToolDefinition,
+  withFileMutationQueue,
 } from "@mariozechner/pi-coding-agent";
 
 /**
@@ -145,18 +146,42 @@ export async function deletePlan(
 }
 
 /**
- * Edits a plan file by replacing oldText with newText.
- * Uses the native edit tool (fuzzy matching, BOM/line-ending handling, diff generation).
- * Returns `true` if the replacement was applied, `false` if oldText was not found.
+ * Unescapes common escape sequences (backslash-backtick -> backtick,
+ * double-backslash -> backslash, literal backslash-n/backslash-t -> newline/
+ * tab). Used to build matching variants so hand-written anchors can match
+ * stored plan text (which keeps those sequences as-is).
  */
-export async function editPlan(
+function unescapeEscapes(text: string): string {
+  return text
+    .replace(/\\\\/g, "\\")
+    .replace(/\\`/g, "`")
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t");
+}
+
+/** Inverse of unescapeEscapes: plain backtick -> backslash-backtick, etc. */
+function escapeEscapes(text: string): string {
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/`/g, "\\`")
+    .replace(/\n/g, "\\n")
+    .replace(/\t/g, "\\t");
+}
+
+/** Result of an editPlan call. */
+export interface EditPlanResult {
+  applied: boolean;
+  /** Why the edit failed (only present when applied === false). */
+  reason?: string;
+}
+
+/** Runs the native edit tool with exact text matching. Returns false when oldText isn't found. */
+async function applyExactEdit(
   cwd: string,
-  planId: string,
+  path: string,
   oldText: string,
   newText: string
 ): Promise<boolean> {
-  const path = planFilePath(cwd, planId);
-
   // Create the native edit tool definition and invoke its execute method.
   // The _ctx parameter is unused by the edit tool's execute implementation,
   // so we pass a minimal placeholder.
@@ -167,7 +192,7 @@ export async function editPlan(
       { path, edits: [{ oldText, newText }] },
       undefined, // signal
       undefined, // onUpdate
-      {} as any  // ctx (unused by execute)
+      {} as any // ctx (unused by execute)
     );
     return true;
   } catch (err) {
@@ -184,4 +209,81 @@ export async function editPlan(
     }
     throw err;
   }
+}
+
+/**
+ * Fallback for when the exact match fails: tries a few escape-normalized
+ * variants of oldText (raw, unescaped, escaped) against the raw stored
+ * content — e.g. a hand-written plain backtick matching a stored
+ * backslash-backtick, and vice versa — and applies a surgical replacement
+ * that leaves the rest of the file untouched. Returns false when no variant
+ * matches.
+ */
+async function applyFallbackEdit(
+  path: string,
+  oldText: string,
+  newText: string
+): Promise<boolean> {
+  let content: string;
+  try {
+    content = await readFile(path, "utf8");
+  } catch {
+    return false;
+  }
+
+  const variants = new Set([
+    oldText,
+    unescapeEscapes(oldText),
+    escapeEscapes(oldText),
+  ]);
+
+  for (const variant of variants) {
+    if (!variant || !content.includes(variant)) continue;
+    const updated = content.replace(variant, newText);
+    await withFileMutationQueue(path, async () => {
+      await writeFile(path, updated, "utf8");
+    });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Edits a plan file by replacing oldText with newText.
+ * Tries the exact match first (native edit tool: fuzzy matching, BOM/line-ending
+ * handling, diff generation), then falls back to an escape-normalized match for
+ * anchors written with escaped sequences. Returns `{ applied: false, reason }`
+ * (with a tail hint) when oldText could not be found either way.
+ */
+export async function editPlan(
+  cwd: string,
+  planId: string,
+  oldText: string,
+  newText: string
+): Promise<EditPlanResult> {
+  const path = planFilePath(cwd, planId);
+
+  if (await applyExactEdit(cwd, path, oldText, newText)) {
+    return { applied: true };
+  }
+  if (await applyFallbackEdit(path, oldText, newText)) {
+    return { applied: true };
+  }
+
+  let tail = "";
+  try {
+    const content = await readFile(path, "utf8");
+    tail = content.slice(-200);
+  } catch {
+    // Plan file doesn't exist
+  }
+
+  return {
+    applied: false,
+    reason:
+      `oldText not found in plan "${planId}". Matching is literal: escape ` +
+      `sequences in the plan file (e.g. backslash-backtick, backslash-n) are ` +
+      `stored as-is.` +
+      (tail ? `\n\nPlan file tail:\n${tail}` : ""),
+  };
 }

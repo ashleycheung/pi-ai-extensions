@@ -40,19 +40,19 @@ export function registerPlanEditTool(pi: ExtensionAPI) {
       });
 
       try {
-        const applied = await editPlan(
+        const result = await editPlan(
           ctx.cwd,
           params.planId,
           params.oldText,
           params.newText
         );
 
-        if (!applied) {
+        if (!result.applied) {
           return {
             content: [
               {
                 type: "text",
-                text: `Edit failed: oldText not found in plan "${params.planId}"`,
+                text: `Edit failed: ${result.reason ?? `oldText not found in plan "${params.planId}"`}`,
               },
             ],
           };
