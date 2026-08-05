@@ -11,6 +11,9 @@
  * - When a `draftKey` is set, the comment text is kept session-only when the
  *   viewer closes without submitting and restored on the next open; it is
  *   cleared once a comment is submitted.
+ * - The comment input renders as a Codex-style rounded box (╭─╮ / ╰─╯ with
+ *   padding, no side pipes) via the shared utils/box.ts helper, colored with
+ *   the theme's muted border color.
  *
  * Used by the diff, readplan, and list_plans commands. Pure — no `pi` or
  * `ctx` dependencies, so it stays in utils/ per the repo conventions.
@@ -34,6 +37,7 @@ import {
   getCommentDraft,
   saveCommentDraft,
 } from "../store/comment-drafts";
+import { applyRoundedBorder } from "../utils/box";
 
 /**
  * Whether the current context is the interactive TUI (the viewer can render).
@@ -115,7 +119,9 @@ export function createCommentViewer(
       editor.getText() ? Math.max(1, editor.getLines().length) : 1
     );
     const inputAreaLines = 3 + editorLineCount;
-    return Math.max(1, tui.terminal.rows - 5 - inputAreaLines);
+    // Fixed overhead (7) = title + title separator + scroll indicator (2) +
+    // input separator + hint + the input box's 2 border rows.
+    return Math.max(1, tui.terminal.rows - 7 - inputAreaLines);
   }
 
   /** Scrolls the body by delta lines (negative = up), clamped to range. */
@@ -228,24 +234,29 @@ export function createCommentViewer(
       : "Press i to type comment • ↑↓ / Ctrl+D / Ctrl+U scroll • Esc to close";
     lines.push(trunc(`${modeIndicator}  ${hint}`));
 
-    // Render editor content (with line limit)
+    // Render editor content (with line limit), boxed Codex-style
+    const content: string[] = [];
     if (isInputMode || editor.getText()) {
       const allEditorLines = editor.getLines();
       const visibleEditorLines = allEditorLines.slice(0, maxEditorLines);
       for (const line of visibleEditorLines) {
-        lines.push(trunc(` ${line}`));
+        content.push(` ${line}`);
       }
       if (allEditorLines.length > maxEditorLines) {
-        lines.push(
-          trunc(
-            ` ⤶ ${allEditorLines.length - maxEditorLines} more line${
-              allEditorLines.length - maxEditorLines !== 1 ? "s" : ""
-            }`
-          )
+        content.push(
+          ` ⤶ ${allEditorLines.length - maxEditorLines} more line${
+            allEditorLines.length - maxEditorLines !== 1 ? "s" : ""
+          }`
         );
       }
     } else {
-      lines.push(trunc(" (press i to start typing)"));
+      content.push(" (press i to start typing)");
+    }
+    const bordered = applyRoundedBorder(content, renderWidth, (s) =>
+      theme.fg("borderMuted", s)
+    );
+    for (const line of bordered) {
+      lines.push(trunc(line));
     }
 
     cachedLines = lines;

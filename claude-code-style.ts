@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { Component, EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { padToWidth, roundBorderEdges } from "./coding-utils/utils/box";
 
 const BRAND_RGB = "215;119;87";
 const brand = (text: string) => `\x1b[38;2;${BRAND_RGB}m${text}\x1b[39m`;
@@ -29,11 +30,6 @@ function center(text: string, width: number): string {
   const w = visibleWidth(text);
   if (w >= width) return truncateToWidth(text, width, "");
   return `${" ".repeat(Math.floor((width - w) / 2))}${text}`;
-}
-
-function padRight(text: string, width: number): string {
-  const clipped = truncateToWidth(text, width, "");
-  return clipped + " ".repeat(Math.max(0, width - visibleWidth(clipped)));
 }
 
 function piLogoFrame(frameIndex: number): string[] {
@@ -72,7 +68,7 @@ function borderLine(
 
 function boxedLine(content: string, width: number): string {
   if (width <= 2) return truncateToWidth(content, width, "");
-  return `${brand("│")}${padRight(content, width - 2)}${brand("│")}`;
+  return `${brand("│")}${padToWidth(content, width - 2)}${brand("│")}`;
 }
 
 function twoColumn(
@@ -81,7 +77,7 @@ function twoColumn(
   leftWidth: number,
   rightWidth: number
 ): string {
-  return `${padRight(left, leftWidth)} ${brand("│")} ${padRight(
+  return `${padToWidth(left, leftWidth)} ${brand("│")} ${padToWidth(
     right,
     rightWidth
   )}`;
@@ -148,7 +144,7 @@ class PiStartupHeader implements Component {
             leftWidth,
             rightWidth
           )
-        : padRight(leftLines[i] ?? "", leftWidth);
+        : padToWidth(leftLines[i] ?? "", leftWidth);
       lines.push(boxedLine(content, width));
     }
     lines.push(borderLine("╰", "", "╯", width));
@@ -167,15 +163,14 @@ class CodexStyleEditor extends CustomEditor {
     super(tui, theme, keybindings, { paddingX: 1 });
   }
 
+  // Shared with the plan/diff viewer comment input (coding-utils/utils/box.ts).
+  // The editor's own render already emits `─` top/bottom edges, so only the
+  // edges get rounded (replaced), keeping scroll-indicator borders intact.
   render(width: number): string[] {
-    const lines = super.render(width);
-    if (lines.length === 0 || width < 4) return lines;
-
-    const border = (s: string) => this.borderColor(s);
-    lines[0] = border(`╭${"─".repeat(Math.max(0, width - 2))}╮`);
-    lines[lines.length - 1] = border(`╰${"─".repeat(Math.max(0, width - 2))}╯`);
-    return lines.map((line) =>
-      padRight(truncateToWidth(line, width, ""), width)
+    return roundBorderEdges(
+      super.render(width),
+      width,
+      (s) => this.borderColor(s)
     );
   }
 }
