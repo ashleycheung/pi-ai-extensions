@@ -3,8 +3,9 @@
  *
  * Renders a title + scrollable body (provided by the caller) with a
  * bottom input area:
- * - Tab toggles input mode; Enter submits the comment, Shift+Enter adds a
- *   newline, Esc closes (Esc again while typing exits input mode first).
+ * - vim-style: press `i` to enter the comment input; Enter submits the
+ *   comment, Shift+Enter adds a newline, Esc exits input mode (back to
+ *   scroll mode) or closes the viewer.
  * - ↑/↓ scroll the body when not in input mode.
  *
  * Used by the diff, readplan, and list_plans commands. Pure — no `pi` or
@@ -95,14 +96,15 @@ export function createCommentViewer(
       return;
     }
 
-    if (matchesKey(data, Key.tab)) {
-      isInputMode = !isInputMode;
+    if (isInputMode) {
+      editor.handleInput(data);
       refresh();
       return;
     }
 
-    if (isInputMode) {
-      editor.handleInput(data);
+    // Scroll mode: vim-style `i` enters the comment input.
+    if (matchesKey(data, "i")) {
+      isInputMode = true;
       refresh();
       return;
     }
@@ -182,8 +184,8 @@ export function createCommentViewer(
     lines.push(trunc("─".repeat(renderWidth)));
     const modeIndicator = isInputMode ? "🔤" : "💬";
     const hint = isInputMode
-      ? "Enter to send • Shift+Enter newline • Tab/Esc to scroll"
-      : "Tab to type comment • ↑↓ scroll • Esc to close";
+      ? "Enter to send • Shift+Enter newline • Esc to exit"
+      : "Press i to type comment • ↑↓ scroll • Esc to close";
     lines.push(trunc(`${modeIndicator}  ${hint}`));
 
     // Render editor content (with line limit)
@@ -203,7 +205,7 @@ export function createCommentViewer(
         );
       }
     } else {
-      lines.push(trunc(" (press Tab to start typing)"));
+      lines.push(trunc(" (press i to start typing)"));
     }
 
     cachedLines = lines;

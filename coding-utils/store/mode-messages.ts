@@ -3,12 +3,32 @@
  */
 
 export enum AIMode {
-  None = "none",
+  Normal = "normal",
   Execute = "execute",
   Plan = "plan",
   Ask = "ask",
   CodeReview = "codereview",
 }
+
+/** Widget label + accent color for each mode (single source of truth). */
+export const MODE_META: Record<AIMode, { label: string; color: string }> = {
+  [AIMode.Normal]: { label: "Normal Mode", color: "#A0AEC0" },
+  [AIMode.Execute]: { label: "Execute Mode", color: "#ED64A6" },
+  [AIMode.Plan]: { label: "Plan Mode", color: "#ED8936" },
+  [AIMode.Ask]: { label: "Ask Mode", color: "#3B82F6" },
+  [AIMode.CodeReview]: { label: "Code Review Mode", color: "#10B981" },
+};
+
+/**
+ * Cycle order for the Shift+Tab mode cycle (starts at Normal, then Plan first).
+ */
+export const AIMODE_CYCLE: AIMode[] = [
+  AIMode.Normal,
+  AIMode.Plan,
+  AIMode.Execute,
+  AIMode.Ask,
+  AIMode.CodeReview,
+];
 
 export const PLAN_MODE_MESSAGE = `
 You are in Plan Mode and you are to draft a plan.

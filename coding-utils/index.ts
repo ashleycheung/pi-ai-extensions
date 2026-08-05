@@ -7,6 +7,8 @@ import { registerExecuteCommand } from "./commands/execute";
 import { registerPlanCommand } from "./commands/plan";
 import { registerAskCommand } from "./commands/ask";
 import { registerCodeReviewCommand } from "./commands/code-review";
+import { registerNormalCommand } from "./commands/normal";
+import { registerModeCycle } from "./commands/mode-cycle";
 import { registerListPlansCommand } from "./commands/list-plans";
 import { registerDeletePlanCommand } from "./commands/delete-plan";
 import { registerDiffCommand } from "./commands/diff";
@@ -42,6 +44,7 @@ export default async function (pi: ExtensionAPI) {
     registerPlanCommand(pi);
     registerAskCommand(pi);
     registerCodeReviewCommand(pi);
+    registerNormalCommand(pi);
     registerListPlansCommand(pi);
     registerDeletePlanCommand(pi);
     registerReadPlanCommand(pi);
@@ -63,4 +66,9 @@ export default async function (pi: ExtensionAPI) {
   // Event handlers
   registerBeforeAgentStartHandler(pi);
   registerCommandSafetyHandler(pi);
+
+  // Shortcuts
+  if (ENABLE_MODES) {
+    registerModeCycle(pi);
+  }
 }

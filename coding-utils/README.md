@@ -1,6 +1,8 @@
 # coding-utils
 
-A pi coding-agent extension that provides mode management (Execute/Plan/Ask), plan CRUD tools, plan interactive commands, and codebase search tools.
+A pi coding-agent extension that provides mode management
+(Normal/Execute/Plan/Ask/Code Review), plan CRUD tools, plan interactive
+commands, and codebase search tools.
 
 ## Folder structure
 
@@ -13,6 +15,10 @@ coding-utils/
 │   ├── execute.ts
 │   ├── plan.ts
 │   ├── ask.ts
+│   ├── code-review.ts
+│   ├── normal.ts
+│   ├── mode-cycle.ts     # Shift+Tab cycles Normal → Plan → Execute → Ask → Code Review
+│   ├── diff.ts           # TUI diff viewer (shared comment viewer)
 │   ├── list-plans.ts      # TUI-heavy plan viewer with comment editor
 │   ├── read-plan.ts        # Shows latest plan (viewer window or notification)
 │   ├── toggle-plan-output.ts # Toggles plan output between viewer window and notification
@@ -31,10 +37,11 @@ coding-utils/
 ├── store/                 # Shared state and constants
 │   ├── mode-state.ts      # modeState object (mode, hasSentInitialModeMessage, showModeMessage)
 │   ├── plan-output-state.ts # planOutputState (viewer/notify) + persistence to ~/.pi/agent/
-│   └── mode-messages.ts   # AIMode enum, PLAN_MODE_MESSAGE, ASK_MODE_MESSAGE
+│   └── mode-messages.ts   # AIMode enum, MODE_META (label/color), cycle order, mode prompts
 └── utils/                 # Pure utility functions (no side effects)
     ├── plans.ts           # Plan CRUD (file I/O for .pi/plans/ directory)
     ├── comment-viewer.ts  # Shared scrollable viewer with comment input (diff/readplan/list_plans)
+    ├── set-mode.ts        # Shared setMode() — widget + state + notify for all mode switches
     ├── format.ts          # hexAnsi color conversion
     ├── transform.ts       # grep/find command transformers (skip node_modules/dist/build)
     ├── truncation.ts      # Long output truncation with temp file fallback
@@ -60,7 +67,8 @@ See the repo-root `docs/` folder for a full behavior reference (`docs/coding-uti
 
 Key behaviors:
 
-- **Plan output modes**: `readplan` / `list_plans` show plan content either in an interactive **viewer window** (scroll, Tab to type a comment, Enter sends it as a user message prefixed `[Plan: <id>]`) or as a **notification**. `/toggle_plan_output` switches between them; the choice is persisted to `<agentDir>/plan-output-mode.json` and defaults to the viewer.
+- **Mode switching**: `/normal`, `/plan`, `/execute`, `/ask`, `/codereview` change the AI mode (widget + prompt injection). **Shift+Tab** cycles through all modes starting at Normal (Normal → Plan → Execute → Ask → Code Review, wrapping). Requires `app.thinking.cycle` unbound in `~/.pi/agent/keybindings.json` (the extension writes `{"app.thinking.cycle": []}` on install; `/reload` after editing).
+- **Plan output modes**: `readplan` / `list_plans` show plan content either in an interactive **viewer window** (scroll with ↑/↓, press `i` to type a comment — vim-style, Enter sends it as a user message prefixed `[Plan: <id>]`, Esc exits) or as a **notification**. `/toggle_plan_output` switches between them; the choice is persisted to `<agentDir>/plan-output-mode.json` and defaults to the viewer.
 - **Plan mode safety**: in Plan/Ask/Code Review modes, `bash` commands are allowlisted (`utils/command-patterns.ts`); harmless redirects and `git -C` prefixes are normalized, compound commands are split, and only known read-only commands pass. `edit` is blocked in those modes; `plan_create`/`plan_edit`/`plan_delete` are blocked in Ask/Code Review.
 - **plan_edit matching**: exact match first, then an escape-unescaped fallback; failures include a tail of the plan file.
 

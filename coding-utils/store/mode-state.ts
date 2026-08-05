@@ -12,7 +12,7 @@
 import { AIMode } from "./mode-messages";
 
 export const modeState = {
-  mode: AIMode.None as AIMode,
+  mode: AIMode.Normal as AIMode,
   hasSentInitialModeMessage: false,
   showModeMessage: false,
 };

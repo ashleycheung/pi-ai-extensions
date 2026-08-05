@@ -16,6 +16,7 @@ Commands switch between read-only and full-access modes. State lives in
 
 | Command | Effect |
 | --- | --- |
+| `/normal` | Normal Mode (gray widget) — default, full access, no mode prompt |
 | `/plan` | Plan Mode (orange widget) — draft plans, read-only |
 | `/execute` | Execute Mode (pink widget) — full access |
 | `/ask` | Ask Mode (blue widget) — read-only, no plan tools |
@@ -23,9 +24,18 @@ Commands switch between read-only and full-access modes. State lives in
 | `/showmodemessage` | Set `showModeMessage = true` |
 | `/hidemodemessage` | Set `showModeMessage = false` |
 
-Each mode command sets the `ai-mode-widget` widget above the editor and marks
-`hasSentInitialModeMessage = false` so the next agent start re-injects the
-mode instructions.
+**Shift+Tab cycles modes** (Claude Code style): forward, starting at Normal →
+Plan → Execute → Ask → Code Review, wrapping around
+(`commands/mode-cycle.ts`, registered via `pi.registerShortcut`). Because
+Shift+Tab is pi's reserved built-in binding for `app.thinking.cycle`,
+`~/.pi/agent/keybindings.json` must unbind it — the extension creates the
+file with `{"app.thinking.cycle": []}`; after editing keybindings you must
+`/reload` pi for shortcuts to take effect.
+
+All mode commands (and the cycle) share one implementation,
+`utils/set-mode.ts` `setMode()`: each sets the `ai-mode-widget` widget above
+the editor and marks `hasSentInitialModeMessage = false` so the next agent
+start re-injects the mode instructions.
 
 On `before_agent_start` (`events/before-agent-start.ts`), the mode's prompt
 (`store/mode-messages.ts`: `PLAN_MODE_MESSAGE`, `ASK_MODE_MESSAGE`,
@@ -112,7 +122,8 @@ small.
 ### Plan output modes
 
 - **viewer** (default): the plan opens in a custom TUI window —
-  scrollable rendered markdown (↑/↓), **Tab** toggles the comment input,
+  scrollable rendered markdown (↑/↓), **i** enters the comment input (vim-style;
+  Esc returns to scroll mode),
   **Enter** sends the comment as a user message prefixed
   `[Plan: <id>]\n\n<comment>`, **Esc** closes (Esc again exits input mode
   first). Implemented by the shared `utils/comment-viewer.ts`.
