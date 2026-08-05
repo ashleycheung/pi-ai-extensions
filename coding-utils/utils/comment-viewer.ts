@@ -6,7 +6,11 @@
  * - vim-style: press `i` to enter the comment input; Enter submits the
  *   comment, Shift+Enter adds a newline, Esc exits input mode (back to
  *   scroll mode) or closes the viewer.
- * - ↑/↓ scroll the body when not in input mode.
+ * - ↑/↓ scroll by one line, Ctrl+D/Ctrl+U scroll by half a viewport
+ *   (vim-style) when not in input mode.
+ * - When a `draftKey` is set, the comment text is kept session-only when the
+ *   viewer closes without submitting and restored on the next open; it is
+ *   cleared once a comment is submitted.
  *
  * Used by the diff, readplan, and list_plans commands. Pure — no `pi` or
  * `ctx` dependencies, so it stays in utils/ per the repo conventions.
@@ -25,6 +29,11 @@ import {
   type ExtensionCommandContext,
   type Theme,
 } from "@mariozechner/pi-coding-agent";
+import {
+  clearCommentDraft,
+  getCommentDraft,
+  saveCommentDraft,
+} from "../store/comment-drafts";
 
 /**
  * Whether the current context is the interactive TUI (the viewer can render).
@@ -47,6 +56,12 @@ export interface CommentViewerOptions {
   renderBody: (width: number) => string[];
   /** Maximum visible lines of the comment editor. Defaults to 5. */
   maxEditorLines?: number;
+  /**
+   * When set, the comment text is saved when the viewer closes without
+   * submitting and restored on the next open (session-only, per key).
+   * Cleared when a comment is submitted. Keyed e.g. `plan:<cwd>:<planId>`.
+   */
+  draftKey?: string;
 }
 
 /**
@@ -74,11 +89,43 @@ export function createCommentViewer(
   const editor = new Editor(tui, theme as unknown as EditorTheme, {
     paddingX: 0,
   });
+
+  // Restore a previously saved draft (session-only, per draftKey).
+  const draftKey = options.draftKey;
+  if (draftKey) {
+    const draft = getCommentDraft(draftKey);
+    if (draft) {
+      editor.setText(draft);
+    }
+  }
+
   editor.onSubmit = (text) => {
     if (text.trim()) {
+      if (draftKey) {
+        clearCommentDraft(draftKey);
+      }
       done(text);
     }
   };
+
+  /** Height of the scrollable body area in lines. */
+  function getViewportHeight(): number {
+    const editorLineCount = Math.min(
+      maxEditorLines,
+      editor.getText() ? Math.max(1, editor.getLines().length) : 1
+    );
+    const inputAreaLines = 3 + editorLineCount;
+    return Math.max(1, tui.terminal.rows - 5 - inputAreaLines);
+  }
+
+  /** Scrolls the body by delta lines (negative = up), clamped to range. */
+  function scrollBy(delta: number) {
+    const viewportHeight = getViewportHeight();
+    const bodyLines = options.renderBody(renderedWidth);
+    const maxScroll = Math.max(0, bodyLines.length - viewportHeight);
+    scrollOffset = Math.min(maxScroll, Math.max(0, scrollOffset + delta));
+    refresh();
+  }
 
   function refresh() {
     cachedLines = undefined;
@@ -91,6 +138,11 @@ export function createCommentViewer(
         isInputMode = false;
         refresh();
         return;
+      }
+      // Leaving without submitting: keep the current text as the draft
+      // (empty text means the user cleared it, which deletes the draft).
+      if (draftKey) {
+        saveCommentDraft(draftKey, editor.getText());
       }
       done(undefined);
       return;
@@ -111,24 +163,20 @@ export function createCommentViewer(
 
     // Scroll mode
     if (matchesKey(data, Key.up)) {
-      scrollOffset = Math.max(0, scrollOffset - 1);
-      refresh();
+      scrollBy(-1);
       return;
     }
     if (matchesKey(data, Key.down)) {
-      const editorLineCount = Math.min(
-        maxEditorLines,
-        editor.getText() ? Math.max(1, editor.getLines().length) : 1
-      );
-      const inputAreaLines = 3 + editorLineCount;
-      const viewportHeight = Math.max(
-        1,
-        tui.terminal.rows - 5 - inputAreaLines
-      );
-      const bodyLines = options.renderBody(renderedWidth);
-      const maxScroll = Math.max(0, bodyLines.length - viewportHeight);
-      scrollOffset = Math.min(maxScroll, scrollOffset + 1);
-      refresh();
+      scrollBy(1);
+      return;
+    }
+    // Vim-style half-page scroll.
+    if (matchesKey(data, Key.ctrl("d"))) {
+      scrollBy(Math.max(1, Math.floor(getViewportHeight() / 2)));
+      return;
+    }
+    if (matchesKey(data, Key.ctrl("u"))) {
+      scrollBy(-Math.max(1, Math.floor(getViewportHeight() / 2)));
       return;
     }
   }
@@ -140,15 +188,7 @@ export function createCommentViewer(
     renderedWidth = renderWidth;
 
     // Calculate editor lines to determine viewport
-    const editorLineCount = Math.min(
-      maxEditorLines,
-      editor.getText() ? Math.max(1, editor.getLines().length) : 1
-    );
-    const inputAreaLines = 3 + editorLineCount;
-    const viewportHeight = Math.max(
-      1,
-      tui.terminal.rows - 5 - inputAreaLines
-    );
+    const viewportHeight = getViewportHeight();
     const trunc = (line: string) => truncateToWidth(line, renderWidth);
 
     const bodyLines = options.renderBody(renderWidth);
@@ -185,7 +225,7 @@ export function createCommentViewer(
     const modeIndicator = isInputMode ? "🔤" : "💬";
     const hint = isInputMode
       ? "Enter to send • Shift+Enter newline • Esc to exit"
-      : "Press i to type comment • ↑↓ scroll • Esc to close";
+      : "Press i to type comment • ↑↓ / Ctrl+D / Ctrl+U scroll • Esc to close";
     lines.push(trunc(`${modeIndicator}  ${hint}`));
 
     // Render editor content (with line limit)

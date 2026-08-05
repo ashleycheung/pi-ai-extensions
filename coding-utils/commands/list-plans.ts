@@ -64,6 +64,7 @@ export function registerListPlansCommand(pi: ExtensionAPI) {
           );
           return createCommentViewer(tui, theme, kb, done, {
             title: `📄 ${planTitle}  (${planId})`,
+            draftKey: `plan:${ctx.cwd}:${planId}`,
             renderBody: (width) => {
               markdown.invalidate();
               return markdown.render(width);

@@ -69,6 +69,7 @@ export function registerDiffCommand(pi: ExtensionAPI) {
 
           return createCommentViewer(tui, theme, kb, done, {
             title: `📄 ${theme.fg("accent", theme.bold("Git Diff"))}`,
+            draftKey: `diff:${ctx.cwd}`,
             renderBody: () => diffLines.map(colorDiffLine),
           });
         }

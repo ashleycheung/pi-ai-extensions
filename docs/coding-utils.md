@@ -122,11 +122,15 @@ small.
 ### Plan output modes
 
 - **viewer** (default): the plan opens in a custom TUI window —
-  scrollable rendered markdown (↑/↓), **i** enters the comment input (vim-style;
+  scrollable rendered markdown (↑/↓ line-by-line, **Ctrl+D / Ctrl+U** half-page,
+  vim-style), **i** enters the comment input (vim-style;
   Esc returns to scroll mode),
   **Enter** sends the comment as a user message prefixed
   `[Plan: <id>]\n\n<comment>`, **Esc** closes (Esc again exits input mode
-  first). Implemented by the shared `utils/comment-viewer.ts`.
+  first). The comment text is kept as a **session-only draft** per plan
+  (`plan:<cwd>:<planId>`, stored in `store/comment-drafts.ts`): closing without
+  submitting saves it, reopening the same plan restores it, and submitting
+  clears it. Implemented by the shared `utils/comment-viewer.ts`.
 - **notify**: current notification behavior — `readplan` notifies;
   `list_plans` sets the editor text to `[ Plan <id> ]\n\n` and notifies.
 - Non-TUI contexts (print/RPC) always fall back to notify.
@@ -135,7 +139,9 @@ small.
 
 Runs `git diff` (extra args appended), shows the result in the same shared
 viewer (colorized by diff prefix: + green, − red, @@ accent, headers muted),
-with a comment input whose text is sent as a user message. Empty diff →
+with a comment input whose text is sent as a user message (draft kept
+session-only per workspace, keyed `diff:<cwd>` — same save/restore/clear
+behavior as the plan viewer). Empty diff →
 notify; non-TUI → notify.
 
 ## Search tools
