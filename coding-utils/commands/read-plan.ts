@@ -47,6 +47,7 @@ export function registerReadPlanCommand(pi: ExtensionAPI) {
           return createCommentViewer(tui, theme, kb, done, {
             title: `📄 ${latest.title}  (${latest.id})`,
             draftKey: `plan:${ctx.cwd}:${latest.id}`,
+            thinkingLevel: pi.getThinkingLevel(),
             renderBody: (width) => {
               markdown.invalidate();
               return markdown.render(width);

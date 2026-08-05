@@ -13,13 +13,16 @@
  *   cleared once a comment is submitted.
  * - The comment input renders as a Codex-style rounded box (╭─╮ / ╰─╯ with
  *   padding, no side pipes) via the shared utils/box.ts helper, colored with
- *   the theme's muted border color.
+ *   the thinking-level border color like pi's main input editor. While typing,
+ *   the cursor is shown the same way as the main editor (inverse-video block
+ *   via renderCursor).
  *
  * Used by the diff, readplan, and list_plans commands. Pure — no `pi` or
  * `ctx` dependencies, so it stays in utils/ per the repo conventions.
  */
 import {
   type Component,
+  CURSOR_MARKER,
   Editor,
   type EditorTheme,
   Key,
@@ -38,6 +41,30 @@ import {
   saveCommentDraft,
 } from "../store/comment-drafts";
 import { applyRoundedBorder } from "../utils/box";
+
+/** Thinking-level string accepted by Theme.getThinkingBorderColor. */
+type ThinkingLevel = Parameters<Theme["getThinkingBorderColor"]>[0];
+
+/** Grapheme segmentation for cursor rendering (matches the main editor). */
+const graphemeSegmenter = new Intl.Segmenter(undefined, {
+  granularity: "grapheme",
+});
+
+/**
+ * Renders the main editor's cursor into a text line at the given column:
+ * inverse-video on the grapheme under the cursor (or a highlighted space at
+ * end of line), with the zero-width CURSOR_MARKER before it so the TUI can
+ * position the hardware cursor (IME support).
+ */
+function renderCursor(line: string, col: number): string {
+  const clamped = Math.max(0, Math.min(col, line.length));
+  const after = line.slice(clamped);
+  if (after.length > 0) {
+    const first = [...graphemeSegmenter.segment(after)][0]?.segment ?? "";
+    return `${line.slice(0, clamped)}${CURSOR_MARKER}\x1b[7m${first}\x1b[0m${after.slice(first.length)}`;
+  }
+  return `${line}${CURSOR_MARKER}\x1b[7m \x1b[0m`;
+}
 
 /**
  * Whether the current context is the interactive TUI (the viewer can render).
@@ -66,6 +93,12 @@ export interface CommentViewerOptions {
    * Cleared when a comment is submitted. Keyed e.g. `plan:<cwd>:<planId>`.
    */
   draftKey?: string;
+  /**
+   * Thinking level used for the comment input's border color, matching the
+   * main input editor (pi colors it via getThinkingBorderColor). Defaults to
+   * "off" (dark gray).
+   */
+  thinkingLevel?: ThinkingLevel;
 }
 
 /**
@@ -102,6 +135,12 @@ export function createCommentViewer(
       editor.setText(draft);
     }
   }
+
+  // Match the main input editor's border: the thinking-level border color
+  // (same logic as pi's updateEditorBorderColor), "off" = dark gray.
+  const inputBorderColor = theme.getThinkingBorderColor(
+    options.thinkingLevel ?? "off"
+  );
 
   editor.onSubmit = (text) => {
     if (text.trim()) {
@@ -234,13 +273,21 @@ export function createCommentViewer(
       : "Press i to type comment • ↑↓ / Ctrl+D / Ctrl+U scroll • Esc to close";
     lines.push(trunc(`${modeIndicator}  ${hint}`));
 
-    // Render editor content (with line limit), boxed Codex-style
+    // Render editor content (with line limit), boxed Codex-style.
+    // No box (and no placeholder) until there is text or the user is typing.
     const content: string[] = [];
     if (isInputMode || editor.getText()) {
       const allEditorLines = editor.getLines();
       const visibleEditorLines = allEditorLines.slice(0, maxEditorLines);
-      for (const line of visibleEditorLines) {
-        content.push(` ${line}`);
+      // Logical cursor position (indexes getLines()) to render while typing.
+      const cursor = isInputMode ? editor.getCursor() : null;
+      for (let i = 0; i < visibleEditorLines.length; i++) {
+        let line = ` ${visibleEditorLines[i]}`;
+        if (cursor && cursor.line === i) {
+          // +1 accounts for the leading space added above.
+          line = renderCursor(line, cursor.col + 1);
+        }
+        content.push(line);
       }
       if (allEditorLines.length > maxEditorLines) {
         content.push(
@@ -249,12 +296,8 @@ export function createCommentViewer(
           }`
         );
       }
-    } else {
-      content.push(" (press i to start typing)");
     }
-    const bordered = applyRoundedBorder(content, renderWidth, (s) =>
-      theme.fg("borderMuted", s)
-    );
+    const bordered = applyRoundedBorder(content, renderWidth, inputBorderColor);
     for (const line of bordered) {
       lines.push(trunc(line));
     }
