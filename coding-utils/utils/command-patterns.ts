@@ -24,7 +24,7 @@ const HARMLESS_REDIRECTS = [
 // Flatten `git -C <path> ...` / `git -c <k>=<v> ...` to `git ...`.
 const GIT_FLAG_PREFIX = /\bgit(\s+-C\s+\S+|\s+-c\s+\S+)+\s+/gi;
 
-function normalizeCommand(command: string): string {
+export function normalizeCommand(command: string): string {
   let normalized = command;
   for (const pattern of HARMLESS_REDIRECTS) {
     normalized = normalized.replace(pattern, " ");

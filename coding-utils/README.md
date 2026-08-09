@@ -31,18 +31,21 @@ coding-utils/
 │   ├── plan-list.ts
 │   ├── plan-create.ts
 │   ├── plan-edit.ts
-│   └── plan-delete.ts
+│   ├── plan-delete.ts
+│   └── request-block-exemption.ts # Approve/reject UI for commands blocked by a mode
 ├── events/                # Event handler registrations
 │   ├── before-agent-start.ts   # Injects mode instructions into agent prompts
 │   └── command-safety.ts       # Blocks destructive commands in Plan/Ask modes
 ├── store/                 # Shared state and constants
 │   ├── mode-state.ts      # modeState object (mode, hasSentInitialModeMessage, showModeMessage)
 │   ├── plan-output-state.ts # planOutputState (viewer/notify) + persistence to ~/.pi/agent/
+│   ├── exemption-store.ts # exemptionStore — in-memory approve/reject decisions for request_block_exemption
 │   └── mode-messages.ts   # AIMode enum, MODE_META (label/color), cycle order, mode prompts
 └── utils/                 # Pure utility functions (no side effects)
     ├── plans.ts           # Plan CRUD (file I/O for .pi/plans/ directory)
     ├── comment-viewer.ts  # Shared scrollable viewer with comment input (diff/readplan/list_plans)
     ├── set-mode.ts        # Shared setMode() — widget + state + notify for all mode switches
+    ├── exemption.ts       # Canonical exemption cache keys + blocked-in-mode helpers
     ├── format.ts          # hexAnsi color conversion
     ├── transform.ts       # grep/find command transformers (skip node_modules/dist/build)
     ├── truncation.ts      # Long output truncation with temp file fallback
@@ -71,6 +74,7 @@ Key behaviors:
 - **Mode switching**: `/normal`, `/plan`, `/execute`, `/ask`, `/codereview` change the AI mode (widget + prompt injection). **Shift+Tab** cycles through all modes starting at Normal (Normal → Plan → Execute → Ask → Code Review, wrapping). Requires `app.thinking.cycle` unbound in `~/.pi/agent/keybindings.json` (the extension writes `{"app.thinking.cycle": []}` on install; `/reload` after editing).
 - **Plan output modes**: `readplan` / `list_plans` show plan content either in an interactive **viewer window** (scroll with ↑/↓ or Ctrl+D / Ctrl+U half-page, press `i` to type a comment — vim-style, Enter sends it as a user message prefixed `[Plan: <id>]`, Esc exits; the comment input is a Codex-style bordered box shared with `claude-code-style.ts`, colored like the main input editor (thinking-level border); it reuses the main editor's render, so long lines word-wrap and the box expands as you type (then scrolls internally, keeping the cursor visible — never truncated); the comment text is kept as a session-only draft per plan and restored on reopen, cleared on submit) or as a **notification**. `/toggle_plan_output` switches between them; the choice is persisted to `<agentDir>/plan-output-mode.json` and defaults to the viewer.
 - **Plan mode safety**: in Plan/Ask/Code Review modes, `bash` commands are allowlisted (`utils/command-patterns.ts`); harmless redirects and `git -C` prefixes are normalized, compound commands are split, and only known read-only commands pass. `edit` is blocked in those modes; `plan_create`/`plan_edit`/`plan_delete` are blocked in Ask/Code Review.
+- **Block exemptions**: the agent can call the `request_block_exemption` tool (with a command + reason) to show an approve/reject dialog for a blocked call. On approval the agent re-issues the original call — the safety handler lets it through. Decisions are cached in memory for the session: the exact same command is auto-approved or auto-blocked afterwards without re-prompting.
 - **plan_edit matching**: exact match first, then an escape-unescaped fallback; failures include a tail of the plan file.
 
 ## Adding a new tool

@@ -87,6 +87,36 @@ injects a short "nudge" reminder instead. `showModeMessage` controls the
 - **`plan_create` / `plan_edit` / `plan_delete`** — blocked in Ask/Code
   Review modes (allowed in Plan).
 
+### Block exemptions (`request_block_exemption`)
+
+Instead of being blocked outright, the agent may call the LLM tool
+`request_block_exemption(command, exemptionReason)` to request a
+user-approved exemption for any of the above blocked calls
+(`tools/request-block-exemption.ts`):
+
+- The user sees an approve/reject dialog (`ctx.ui.confirm`) with the command
+  and the agent's reason; on reject an optional reason may be entered
+  (`ctx.ui.input`, Esc = none).
+- Decisions are cached in memory for the session
+  (`store/exemption-store.ts`): the exact same command is auto-approved or
+  auto-blocked afterwards without re-prompting, and rejected reasons are
+  replayed to the agent.
+- The tool never executes anything — on approval it instructs the agent to
+  re-issue the original tool call, which `events/command-safety.ts` now lets
+  through (approved calls fall through to the normal execution path; bash
+  still gets the grep/find transforms). Rejected calls block with
+  "previously rejected by the user".
+- Canonical cache keys (`utils/exemption.ts`, shared by tool and handler):
+  `bash:<normalized command>` / `edit:<path>` / `plan_edit:<planId>` /
+  `plan_delete:<planId>` / `plan_create`. The agent passes the exact bash
+  command, or `edit:<path>` / `plan_edit:<id>` / `plan_delete:<id>` /
+  `plan_create` for the other tools.
+- Fail closed: no UI (`ctx.hasUI` false), Esc, or timeout → reject (never
+  auto-approve). Requests for commands that are already allowed in the
+  current mode return "no exemption needed" without showing the dialog.
+- Blocked-command steer messages now point at the tool in addition to the
+  switch-mode fallback.
+
 ## Plan system
 
 Plans are markdown files at `<workspace>/.pi/plans/plan.<id>.md`; the title

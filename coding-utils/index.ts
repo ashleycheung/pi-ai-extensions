@@ -24,6 +24,7 @@ import { registerPlanListTool } from "./tools/plan-list";
 import { registerPlanCreateTool } from "./tools/plan-create";
 import { registerPlanEditTool } from "./tools/plan-edit";
 import { registerPlanDeleteTool } from "./tools/plan-delete";
+import { registerRequestBlockExemptionTool } from "./tools/request-block-exemption";
 
 // Event handlers
 import { registerBeforeAgentStartHandler } from "./events/before-agent-start";
@@ -56,6 +57,7 @@ export default async function (pi: ExtensionAPI) {
     registerPlanCreateTool(pi);
     registerPlanEditTool(pi);
     registerPlanDeleteTool(pi);
+    registerRequestBlockExemptionTool(pi);
   }
 
   // Diff

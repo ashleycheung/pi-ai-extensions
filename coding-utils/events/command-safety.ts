@@ -7,6 +7,7 @@ import { modeState } from "../store/mode-state";
 import { AIMode } from "../store/mode-messages";
 import { getUnsafeReason } from "../utils/command-patterns";
 import { transformGrepCommands, transformFindCommands } from "../utils/transform";
+import { getExemptionDecision, rejectedReason } from "../utils/exemption";
 
 export function registerCommandSafetyHandler(pi: ExtensionAPI) {
   pi.on(
@@ -16,20 +17,30 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
         // Bash tool
         case "bash": {
           const command = String(event.input.command);
+          const exemption = getExemptionDecision("bash", event.input);
+
+          // Previously rejected by the user — stay blocked, tell the agent why.
+          if (exemption && !exemption.approved) {
+            return { block: true, reason: rejectedReason(exemption) };
+          }
+
           const unsafeReason = getUnsafeReason(command);
           if (
-            (modeState.mode === AIMode.Plan || modeState.mode === AIMode.Ask || modeState.mode === AIMode.CodeReview) &&
+            !exemption?.approved &&
+            (modeState.mode === AIMode.Plan ||
+              modeState.mode === AIMode.Ask ||
+              modeState.mode === AIMode.CodeReview) &&
             unsafeReason !== undefined
           ) {
-            const modeName = modeState.mode === AIMode.Plan ? "Plan" : modeState.mode === AIMode.Ask ? "Ask" : "Code Review";
-            pi.sendUserMessage(`You are in ${modeName} Mode. This bash command is not allowed: ${unsafeReason}. You must explicitly ask the user to change to execute mode to enable it.`, { deliverAs: "steer" });
-            return {
-              block: true,
-              reason: `
-              You are in ${modeName} Mode.
-              This bash command is not allowed: ${unsafeReason}
-              You must explicitly ask the user to change to execute mode to enable it`,
-            };
+            const modeName =
+              modeState.mode === AIMode.Plan
+                ? "Plan"
+                : modeState.mode === AIMode.Ask
+                  ? "Ask"
+                  : "Code Review";
+            const blockMessage = `You are in ${modeName} Mode. This bash command is not allowed: ${unsafeReason}. If you believe this command is necessary, tell the agent to call the request_block_exemption tool to request your approval (you'll get an approve/reject prompt) — or switch to execute mode.`;
+            pi.sendUserMessage(blockMessage, { deliverAs: "steer" });
+            return { block: true, reason: blockMessage };
           }
 
           if (!command) return;
@@ -52,31 +63,46 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
           return newInput as any;
         }
         case "edit": {
-          if (modeState.mode === AIMode.Plan || modeState.mode === AIMode.Ask || modeState.mode === AIMode.CodeReview) {
-            const modeName = modeState.mode === AIMode.Plan ? "Plan" : modeState.mode === AIMode.Ask ? "Ask" : "Code Review";
-            pi.sendUserMessage(`You are in ${modeName} Mode. Edits are strictly NOT allowed.`, { deliverAs: "steer" });
-            return {
-              block: true,
-              reason: `
-              You are in ${modeName} Mode.
-              Edits are strictly NOT allowed.
-              You must explicitly ask the user to change to execute mode to enable file editing`,
-            };
+          const exemption = getExemptionDecision("edit", event.input);
+
+          if (exemption && !exemption.approved) {
+            return { block: true, reason: rejectedReason(exemption) };
+          }
+
+          if (
+            !exemption?.approved &&
+            (modeState.mode === AIMode.Plan ||
+              modeState.mode === AIMode.Ask ||
+              modeState.mode === AIMode.CodeReview)
+          ) {
+            const modeName =
+              modeState.mode === AIMode.Plan
+                ? "Plan"
+                : modeState.mode === AIMode.Ask
+                  ? "Ask"
+                  : "Code Review";
+            const blockMessage = `You are in ${modeName} Mode. Edits are strictly NOT allowed. If you believe this edit is necessary, tell the agent to call the request_block_exemption tool with "edit:<path>" to request your approval (you'll get an approve/reject prompt) — or switch to execute mode.`;
+            pi.sendUserMessage(blockMessage, { deliverAs: "steer" });
+            return { block: true, reason: blockMessage };
           }
         }
         case "plan_create":
         case "plan_edit":
         case "plan_delete": {
-          if (modeState.mode === AIMode.Ask || modeState.mode === AIMode.CodeReview) {
+          const exemption = getExemptionDecision(event.toolName, event.input);
+
+          if (exemption && !exemption.approved) {
+            return { block: true, reason: rejectedReason(exemption) };
+          }
+
+          if (
+            !exemption?.approved &&
+            (modeState.mode === AIMode.Ask || modeState.mode === AIMode.CodeReview)
+          ) {
             const modeName = modeState.mode === AIMode.Ask ? "Ask" : "Code Review";
-            pi.sendUserMessage(`You are in ${modeName} Mode. Plan modifications are strictly NOT allowed.`, { deliverAs: "steer" });
-            return {
-              block: true,
-              reason: `
-              You are in ${modeName} Mode.
-              You must not create, edit, or delete plans.
-              You must explicitly ask the user to change to another mode to modify plans`,
-            };
+            const blockMessage = `You are in ${modeName} Mode. Plan modifications are strictly NOT allowed. If you believe this plan change is necessary, tell the agent to call the request_block_exemption tool with "plan_create", "plan_edit:<planId>", or "plan_delete:<planId>" to request your approval (you'll get an approve/reject prompt) — or switch to another mode.`;
+            pi.sendUserMessage(blockMessage, { deliverAs: "steer" });
+            return { block: true, reason: blockMessage };
           }
         }
       }
