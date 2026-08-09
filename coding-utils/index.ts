@@ -14,6 +14,7 @@ import { registerDeletePlanCommand } from "./commands/delete-plan";
 import { registerDiffCommand } from "./commands/diff";
 import { registerReadPlanCommand } from "./commands/read-plan";
 import { registerTogglePlanOutputCommand } from "./commands/toggle-plan-output";
+import { registerCodereviewPlanCommand } from "./commands/codereview-plan";
 
 // Tools
 import { registerSearchFilesTool } from "./tools/search-files";
@@ -49,6 +50,7 @@ export default async function (pi: ExtensionAPI) {
     registerDeletePlanCommand(pi);
     registerReadPlanCommand(pi);
     registerTogglePlanOutputCommand(pi);
+    registerCodereviewPlanCommand(pi);
     registerPlanGetTool(pi);
     registerPlanListTool(pi);
     registerPlanCreateTool(pi);

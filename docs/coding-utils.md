@@ -21,6 +21,7 @@ Commands switch between read-only and full-access modes. State lives in
 | `/execute` | Execute Mode (pink widget) — full access |
 | `/ask` | Ask Mode (blue widget) — read-only, no plan tools |
 | `/codereview` | Code Review Mode (green widget) — read-only, review-focused |
+| `/codereview_plan` | Select a plan, then switch to Code Review Mode with `[ Plan <id> ]\nReview this plan` injected into the input |
 | `/showmodemessage` | Set `showModeMessage = true` |
 | `/hidemodemessage` | Set `showModeMessage = false` |
 
@@ -66,7 +67,9 @@ injects a short "nudge" reminder instead. `showModeMessage` controls the
     installs (npm/yarn/pnpm/pip/apt/brew), git write ops (add/commit/push/
     pull/merge/rebase/reset/checkout/branch -d/-D/stash/cherry-pick/revert/
     tag/init/clone), sudo/su, kill/pkill/killall, reboot/shutdown,
-    systemctl/service start|stop|restart, editors (vim/nano/emacs/code/subl).
+    systemctl/service start|stop|restart, editors launched as the command
+    (vim/nano/emacs/code/subl at segment start — anchored, so the bare words
+    in args/paths like `grep code-review-plan` don't false-positive).
   - Allowlist includes: cd; cat/head/tail/less/more/grep/find/ls/pwd/echo/
     printf/wc/sort/uniq/diff/file/stat/du/df/tree/which/whereis/type/env/
     printenv/uname/whoami/id/date/cal/uptime/ps/top/htop/free; read-only
@@ -113,6 +116,9 @@ small.
 - `readplan` — shows the most recently edited plan.
 - `list_plans` — interactive selector (`Exit` cancels), then shows the
   chosen plan.
+- `codereview_plan` — interactive selector (`Exit` cancels); on selection,
+  switches to Code Review Mode and injects `[ Plan <id> ]\nReview this plan`
+  into the input editor.
 - `delete_plan` — selector + confirmation, then deletes.
 - `/toggle_plan_output` — switches plan output between the **viewer window**
   (default) and **notifications**; persisted to `<agentDir>/

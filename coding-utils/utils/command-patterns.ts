@@ -117,7 +117,12 @@ const DESTRUCTIVE_PATTERNS = [
   /\bshutdown\b/i,
   /\bsystemctl\s+(start|stop|restart|enable|disable)/i,
   /\bservice\s+\S+\s+(start|stop|restart)/i,
-  /\b(vim?|nano|emacs|code|subl)\b/i,
+  // Editor launches are only destructive when the editor is the command being
+  // invoked (segment start). Anchored so bare words like "code" or "vim"
+  // inside args/paths (e.g. `grep code-review-plan`, `cat vim.md`) don't
+  // false-positive; `(?![-\w])` also excludes hyphenated words such as
+  // "code-review-plan" or "code-server" at segment start.
+  /^\s*(vim?|nano|emacs|code|subl)(?![\w-])(?:\s|$)/i,
 ];
 
 // Safe read-only commands allowed in plan mode.

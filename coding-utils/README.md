@@ -21,6 +21,7 @@ coding-utils/
 │   ├── diff.ts           # TUI diff viewer (shared comment viewer)
 │   ├── list-plans.ts      # TUI-heavy plan viewer with comment editor
 │   ├── read-plan.ts        # Shows latest plan (viewer window or notification)
+│   ├── codereview-plan.ts # Select plan → Code Review Mode + inject review prompt
 │   ├── toggle-plan-output.ts # Toggles plan output between viewer window and notification
 │   └── delete-plan.ts
 ├── tools/                 # One file per pi.registerTool() call
