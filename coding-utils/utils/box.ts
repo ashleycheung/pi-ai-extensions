@@ -3,8 +3,10 @@
  *
  * Provides the Codex-style rounded border used by the plan/diff comment input
  * (utils/comment-viewer.ts) and by the main input editor styled in
- * extensions/claude-code-style.ts. Pure — no `pi` or `ctx` dependencies, so it
- * stays in utils/ per the repo conventions.
+ * extensions/claude-code-style.ts: `roundBorderEdges` rounds the top/bottom
+ * edges of an already-bordered render (the pi Editor's own `─` borders) into
+ * `╭─…─╮` / `╰─…─╯`. Pure — no `pi` or `ctx` dependencies, so it stays in
+ * utils/ per the repo conventions.
  */
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 
@@ -22,24 +24,6 @@ function borderRow(
   border: (s: string) => string
 ): string {
   return border(`${left}${"─".repeat(Math.max(0, width - 2))}${right}`);
-}
-
-/**
- * Wraps plain content lines in a Codex-style rounded box: a `╭─…─╮` top
- * border, the (padded) content, and a `╰─…─╯` bottom border — no side pipes.
- * Returns the input unchanged when lines is empty or width < 4.
- */
-export function applyRoundedBorder(
-  lines: string[],
-  width: number,
-  border: (s: string) => string
-): string[] {
-  if (lines.length === 0 || width < 4) return lines;
-  return [
-    borderRow("╭", "╮", width, border),
-    ...lines.map((line) => padToWidth(line, width)),
-    borderRow("╰", "╯", width, border),
-  ];
 }
 
 /**

@@ -11,18 +11,19 @@
  * - When a `draftKey` is set, the comment text is kept session-only when the
  *   viewer closes without submitting and restored on the next open; it is
  *   cleared once a comment is submitted.
- * - The comment input renders as a Codex-style rounded box (╭─╮ / ╰─╯ with
- *   padding, no side pipes) via the shared utils/box.ts helper, colored with
- *   the thinking-level border color like pi's main input editor. While typing,
- *   the cursor is shown the same way as the main editor (inverse-video block
- *   via renderCursor).
+ * - The comment input renders through the pi Editor's own `render()` (the
+ *   same render pi's main input editor uses) wrapped in a Codex-style rounded
+ *   box (╭─╮ / ╰─╯) via the shared utils/box.ts helper, colored with the
+ *   thinking-level border color like the main input editor. Because it reuses
+ *   the editor's render, long lines word-wrap and the box expands as you type
+ *   (up to the editor's max height, then scrolls internally keeping the
+ *   cursor visible) — never truncated.
  *
  * Used by the diff, readplan, and list_plans commands. Pure — no `pi` or
  * `ctx` dependencies, so it stays in utils/ per the repo conventions.
  */
 import {
   type Component,
-  CURSOR_MARKER,
   Editor,
   type EditorTheme,
   Key,
@@ -40,31 +41,10 @@ import {
   getCommentDraft,
   saveCommentDraft,
 } from "../store/comment-drafts";
-import { applyRoundedBorder } from "../utils/box";
+import { roundBorderEdges } from "../utils/box";
 
 /** Thinking-level string accepted by Theme.getThinkingBorderColor. */
 type ThinkingLevel = Parameters<Theme["getThinkingBorderColor"]>[0];
-
-/** Grapheme segmentation for cursor rendering (matches the main editor). */
-const graphemeSegmenter = new Intl.Segmenter(undefined, {
-  granularity: "grapheme",
-});
-
-/**
- * Renders the main editor's cursor into a text line at the given column:
- * inverse-video on the grapheme under the cursor (or a highlighted space at
- * end of line), with the zero-width CURSOR_MARKER before it so the TUI can
- * position the hardware cursor (IME support).
- */
-function renderCursor(line: string, col: number): string {
-  const clamped = Math.max(0, Math.min(col, line.length));
-  const after = line.slice(clamped);
-  if (after.length > 0) {
-    const first = [...graphemeSegmenter.segment(after)][0]?.segment ?? "";
-    return `${line.slice(0, clamped)}${CURSOR_MARKER}\x1b[7m${first}\x1b[0m${after.slice(first.length)}`;
-  }
-  return `${line}${CURSOR_MARKER}\x1b[7m \x1b[0m`;
-}
 
 /**
  * Whether the current context is the interactive TUI (the viewer can render).
@@ -85,8 +65,6 @@ export interface CommentViewerOptions {
    * that render markdown should invalidate + re-render inside here.
    */
   renderBody: (width: number) => string[];
-  /** Maximum visible lines of the comment editor. Defaults to 5. */
-  maxEditorLines?: number;
   /**
    * When set, the comment text is saved when the viewer closes without
    * submitting and restored on the next open (session-only, per key).
@@ -113,16 +91,18 @@ export function createCommentViewer(
   done: (result: string | undefined) => void,
   options: CommentViewerOptions
 ): Component & { invalidate(): void } {
-  const maxEditorLines = options.maxEditorLines ?? 5;
   let scrollOffset = 0;
   let isInputMode = false;
   let cachedLines: string[] | undefined;
+  /** Editor box lines from the previous render (height feeds the viewport). */
+  let cachedEditorLines: string[] | undefined;
   let renderedWidth = 0;
 
   // Multi-line editor for comments (Enter=submit, Shift+Enter=newline).
   // The published types declare (tui, theme, options); the bundled pi-tui
-  // runtime matches. The viewer only exercises getText/getLines/handleInput
-  // (never render()/autocomplete), which is why this construction is safe.
+  // runtime matches. The viewer uses getText/handleInput and reuses the
+  // editor's own render() (word-wrap + internal scroll), which is why this
+  // construction is safe.
   const editor = new Editor(tui, theme as unknown as EditorTheme, {
     paddingX: 0,
   });
@@ -141,6 +121,9 @@ export function createCommentViewer(
   const inputBorderColor = theme.getThinkingBorderColor(
     options.thinkingLevel ?? "off"
   );
+  // The editor draws its own borders; color them with the same thinking-level
+  // border as the main input editor.
+  editor.borderColor = inputBorderColor;
 
   editor.onSubmit = (text) => {
     if (text.trim()) {
@@ -153,14 +136,11 @@ export function createCommentViewer(
 
   /** Height of the scrollable body area in lines. */
   function getViewportHeight(): number {
-    const editorLineCount = Math.min(
-      maxEditorLines,
-      editor.getText() ? Math.max(1, editor.getLines().length) : 1
-    );
-    const inputAreaLines = 3 + editorLineCount;
-    // Fixed overhead (7) = title + title separator + scroll indicator (2) +
-    // input separator + hint + the input box's 2 border rows.
-    return Math.max(1, tui.terminal.rows - 7 - inputAreaLines);
+    const editorBoxHeight = cachedEditorLines?.length ?? 0;
+    // Fixed overhead (8) = title + title separator + scroll indicator (2) +
+    // input separator + hint + slack (2). With the box shown this matches the
+    // previous `rows - 10 - editorLineCount` (box = 2 borders + content).
+    return Math.max(1, tui.terminal.rows - 8 - editorBoxHeight);
   }
 
   /** Scrolls the body by delta lines (negative = up), clamped to range. */
@@ -231,11 +211,24 @@ export function createCommentViewer(
 
     const renderWidth = Math.max(1, width);
     renderedWidth = renderWidth;
-
-    // Calculate editor lines to determine viewport
-    const viewportHeight = getViewportHeight();
     const trunc = (line: string) => truncateToWidth(line, renderWidth);
 
+    // Render the comment input through the editor's own render (word-wrapping
+    // + internal scroll keeping the cursor visible, like the main input).
+    // No box (and no placeholder) until there is text or the user is typing.
+    if (isInputMode || editor.getText()) {
+      editor.focused = isInputMode;
+      cachedEditorLines = roundBorderEdges(
+        editor.render(renderWidth),
+        renderWidth,
+        inputBorderColor
+      );
+    } else {
+      cachedEditorLines = undefined;
+    }
+
+    // Viewport height depends on the rendered editor box height.
+    const viewportHeight = getViewportHeight();
     const bodyLines = options.renderBody(renderWidth);
 
     const lines: string[] = [];
@@ -245,6 +238,8 @@ export function createCommentViewer(
     lines.push(trunc("─".repeat(renderWidth)));
 
     // Content
+    const maxScroll = Math.max(0, bodyLines.length - viewportHeight);
+    scrollOffset = Math.min(scrollOffset, maxScroll);
     const visible = bodyLines.slice(scrollOffset, scrollOffset + viewportHeight);
     for (const line of visible) {
       lines.push(trunc(line));
@@ -252,7 +247,6 @@ export function createCommentViewer(
 
     // Scroll indicator
     const totalLines = bodyLines.length;
-    const maxScroll = Math.max(0, totalLines - viewportHeight);
     if (maxScroll > 0) {
       lines.push(trunc("─".repeat(renderWidth)));
       lines.push(
@@ -273,33 +267,11 @@ export function createCommentViewer(
       : "Press i to type comment • ↑↓ / Ctrl+D / Ctrl+U scroll • Esc to close";
     lines.push(trunc(`${modeIndicator}  ${hint}`));
 
-    // Render editor content (with line limit), boxed Codex-style.
-    // No box (and no placeholder) until there is text or the user is typing.
-    const content: string[] = [];
-    if (isInputMode || editor.getText()) {
-      const allEditorLines = editor.getLines();
-      const visibleEditorLines = allEditorLines.slice(0, maxEditorLines);
-      // Logical cursor position (indexes getLines()) to render while typing.
-      const cursor = isInputMode ? editor.getCursor() : null;
-      for (let i = 0; i < visibleEditorLines.length; i++) {
-        let line = ` ${visibleEditorLines[i]}`;
-        if (cursor && cursor.line === i) {
-          // +1 accounts for the leading space added above.
-          line = renderCursor(line, cursor.col + 1);
-        }
-        content.push(line);
+    // Editor box (already bordered by the editor itself, edges rounded).
+    if (cachedEditorLines) {
+      for (const line of cachedEditorLines) {
+        lines.push(trunc(line));
       }
-      if (allEditorLines.length > maxEditorLines) {
-        content.push(
-          ` ⤶ ${allEditorLines.length - maxEditorLines} more line${
-            allEditorLines.length - maxEditorLines !== 1 ? "s" : ""
-          }`
-        );
-      }
-    }
-    const bordered = applyRoundedBorder(content, renderWidth, inputBorderColor);
-    for (const line of bordered) {
-      lines.push(trunc(line));
     }
 
     cachedLines = lines;

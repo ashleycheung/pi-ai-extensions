@@ -128,9 +128,12 @@ small.
   **Enter** sends the comment as a user message prefixed
   `[Plan: <id>]\n\n<comment>`, **Esc** closes (Esc again exits input mode
   first). The comment input renders as a **Codex-style bordered box**
-  (rounded `╭─╮`/`╰─╯` top/bottom, padded — shared with `claude-code-style.ts`
+  (rounded `╭─╮`/`╰─╯` top/bottom — shared with `claude-code-style.ts`
   via `utils/box.ts`), colored with the **thinking-level border color** like
-  pi's main input editor (`thinkingLevel` option). The comment text is kept as a
+  pi's main input editor (`thinkingLevel` option). It reuses the main
+  editor's render, so long lines **word-wrap** and the box **expands as you
+  type** (up to the editor's max height, then scrolls internally keeping the
+  cursor visible — never truncated). The comment text is kept as a
   **session-only draft** per plan
   (`plan:<cwd>:<planId>`, stored in `store/comment-drafts.ts`): closing without
   submitting saves it, reopening the same plan restores it, and submitting
