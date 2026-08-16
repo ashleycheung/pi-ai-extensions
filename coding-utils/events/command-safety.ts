@@ -6,7 +6,10 @@ import {
 import { modeState } from "../store/mode-state";
 import { AIMode } from "../store/mode-messages";
 import { getUnsafeReason } from "../utils/command-patterns";
-import { transformGrepCommands, transformFindCommands } from "../utils/transform";
+import {
+  transformGrepCommands,
+  transformFindCommands,
+} from "../utils/transform";
 import { getExemptionDecision, rejectedReason } from "../utils/exemption";
 
 export function registerCommandSafetyHandler(pi: ExtensionAPI) {
@@ -36,9 +39,9 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
               modeState.mode === AIMode.Plan
                 ? "Plan"
                 : modeState.mode === AIMode.Ask
-                  ? "Ask"
-                  : "Code Review";
-            const blockMessage = `You are in ${modeName} Mode. This bash command is not allowed: ${unsafeReason}. If you believe this command is necessary, tell the agent to call the request_block_exemption tool to request your approval (you'll get an approve/reject prompt) — or switch to execute mode.`;
+                ? "Ask"
+                : "Code Review";
+            const blockMessage = `You are in ${modeName} Mode. This bash command is not allowed: ${unsafeReason}. If you believe this command is necessary, you can use the request_block_exemption tool for an exemption to run this command (you'll get an approve/reject prompt) — or switch to execute mode.`;
             pi.sendUserMessage(blockMessage, { deliverAs: "steer" });
             return { block: true, reason: blockMessage };
           }
@@ -79,9 +82,9 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
               modeState.mode === AIMode.Plan
                 ? "Plan"
                 : modeState.mode === AIMode.Ask
-                  ? "Ask"
-                  : "Code Review";
-            const blockMessage = `You are in ${modeName} Mode. Edits are strictly NOT allowed. If you believe this edit is necessary, tell the agent to call the request_block_exemption tool with "edit:<path>" to request your approval (you'll get an approve/reject prompt) — or switch to execute mode.`;
+                ? "Ask"
+                : "Code Review";
+            const blockMessage = `You are in ${modeName} Mode. Edits are strictly NOT allowed. If you believe this command is necessary, you can use the request_block_exemption tool for an exemption to run this command (you'll get an approve/reject prompt) — or switch to execute mode.`;
             pi.sendUserMessage(blockMessage, { deliverAs: "steer" });
             return { block: true, reason: blockMessage };
           }
@@ -97,10 +100,12 @@ export function registerCommandSafetyHandler(pi: ExtensionAPI) {
 
           if (
             !exemption?.approved &&
-            (modeState.mode === AIMode.Ask || modeState.mode === AIMode.CodeReview)
+            (modeState.mode === AIMode.Ask ||
+              modeState.mode === AIMode.CodeReview)
           ) {
-            const modeName = modeState.mode === AIMode.Ask ? "Ask" : "Code Review";
-            const blockMessage = `You are in ${modeName} Mode. Plan modifications are strictly NOT allowed. If you believe this plan change is necessary, tell the agent to call the request_block_exemption tool with "plan_create", "plan_edit:<planId>", or "plan_delete:<planId>" to request your approval (you'll get an approve/reject prompt) — or switch to another mode.`;
+            const modeName =
+              modeState.mode === AIMode.Ask ? "Ask" : "Code Review";
+            const blockMessage = `You are in ${modeName} Mode. Plan modifications are strictly NOT allowed. If you believe this command is necessary, you can use the request_block_exemption tool for an exemption to run this command (you'll get an approve/reject prompt) — or switch to execute mode.`;
             pi.sendUserMessage(blockMessage, { deliverAs: "steer" });
             return { block: true, reason: blockMessage };
           }
